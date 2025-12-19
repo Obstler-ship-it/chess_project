@@ -28,6 +28,7 @@ class Piece:
         raise NotImplementedError("Subclass must implement get_image_path()")
 
     def __del__(self):
+        """ Nur für Debug """
         # Destruktor: Wird aufgerufen, wenn Figur gelöscht wird
         print(f"{self.notation} - {self.color} piece destroyed")
 
@@ -42,10 +43,6 @@ class King(Piece):
         self.moved = False  # Für Rochade (O-O) wichtig
         self.checkmate = False
         self.castling_rights = {'kingside': True, 'queenside': True}
-
-
-    def rochade_possible(self) -> bool:
-        """ implementieren """
     
     def get_image_path(self) -> str:
         return f'pieces/{self.color}_king.png'
@@ -55,8 +52,8 @@ class King(Piece):
         Gibt alle legalen Züge des Königs zurück.
         :param board: Board-Objekt mit board.squares als np.array
         :return: Tuple (legal_moves, blocked_by)
-        legal_moves: Liste von Tupeln (row, col, blocked, value, self)
-        blocked_by: Liste von (row, col), Felder die blockiert sind
+        legal_moves: Liste von Tupeln (row, col, target(False or piece), self)
+        blocked_by: Liste von (row, col, self), Felder die blockiert sind
         """
         legal_moves = []
         blocked_by = []
@@ -127,7 +124,7 @@ class Queen(Piece):
                 if not (0 <= row < 8 and 0 <= col < 8):
                     break  # außerhalb des Brettes
 
-                target = board[row, col]
+                target = board.squares[row, col]
 
                 if target is None:  # Leeres Feld
                     legal_moves.append((row, col, False, self))
@@ -180,7 +177,7 @@ class LeftRook(Piece):
                 if not (0 <= row < 8 and 0 <= col < 8):
                     break
 
-                target = board[row, col]
+                target = board.squares[row, col]
 
                 if target is None:  # Leeres Feld
                     legal_moves.append((row, col, False, self))
@@ -233,7 +230,7 @@ class RightRook(Piece):
                 if not (0 <= row < 8 and 0 <= col < 8):
                     break
 
-                target = board[row, col]
+                target = board.squares[row, col]
 
                 if target is None:  # Leeres Feld
                     legal_moves.append((row, col, False, self))
@@ -285,7 +282,7 @@ class Bishop(Piece):
                 if not (0 <= row < 8 and 0 <= col < 8):
                     break
 
-                target = board[row, col]
+                target = board.squares[row, col]
 
                 if target is None:  # Leeres Feld
                     legal_moves.append((row, col, False, self))
@@ -325,16 +322,16 @@ class Knight(Piece):
 
         directions = [(2, 1), (2, -1), (-2, 1), (-2, -1), (1, 2), (-1, 2), (1, -2), (-1, -2)]
 
-        row, col = self.position
+        self_row, self_col = self.position
 
         for dx, dy in directions:
 
-            row = row + dx
-            col = col + dy
+            row = self_row + dx
+            col = self_col + dy
 
             if (0 <= row < 8 and 0 <= col < 8):
 
-                target = board[row, col]
+                target = board.squares[row, col]
 
                 if target is None:  # Leeres Feld
                     legal_moves.append((row, col, False, self))
@@ -342,67 +339,15 @@ class Knight(Piece):
                 elif target.color != self.color:  # Schlagen möglich
                     legal_moves.append((row, col, target, self))
                     blocked_by.append((row, col, self))
-                    break
 
                 else:  # Eigene Figur blockiert
                     blocked_by.append((row, col, self))
-                    break
 
         return legal_moves, blocked_by
 
     def __str__(self):
         return "♞" if self.color == "black" else "♘"
 
-
-class WhitePawn(Piece):
-    """ Weißer Bauer """
-
-    def __init__(self, color: str, position: tuple):
-        super().__init__(color, position, notation='P', is_pawn=True)
-        self.moved = False
-        self.moved_2_once = False
-    
-    def get_image_path(self) -> str:
-        return f'pieces/{self.color}_pawn.png'
-
-    def get_legal_moves(self, board: 'bd.Board') -> tuple[list, list]:
-        """
-        Gibt alle legalen Züge des Bauers zurück.
-        :param board: 2D np.array mit Figurenobjekten oder None
-        :return: Tuple (legal_moves, blocked_by)
-        """
-        legal_moves = []
-        blocked_by = []
-
-        row, col = self.position
-
-        if row + 1 < 8:
-            if board[row + 1, col] is None:
-                legal_moves.append((row + 1, col, False, self))  # Ziehen möglich
-            else:
-                blocked_by.append((row + 1, col, self))  # Von Spielfigur geblockt
-
-        if 0 <= col -1 and col + 1 < 8:  # En-passant
-            for (x, y) in [(row, col + 1), (row, col - 1)]:
-                target = board[x, y]
-                square = board[x + 1 , y]
-                if target.is_pawn and square is None:
-                    legal_moves.append((x + 1 , y, target, self))
-
-        if (self.moved is False) and (board[row + 2, col] is None):
-            legal_moves.append((row + 2, col, False, self))  # Zwei Felder ziehen möglich
-
-        for (x, y) in [(row + 1, col +1), (row + 1, col - 1)]:
-            if (0 <= x < 8 and 0 <= y < 8):
-                target = board[x, y]
-                if target is not None:
-                    legal_moves.append((x, y, target, self))  # Schlagen möglich
-
-        return legal_moves, blocked_by
-
-    def __str__(self):
-        return "♙"
-    
 
 class BlackPawn(Piece):
     """ Schwarzer Bauer """
@@ -426,29 +371,86 @@ class BlackPawn(Piece):
 
         row, col = self.position
 
-        if 0 <= row - 1:
-            if board[row - 1, col] is None:
-                legal_moves.append((row - 1, col, False, self))  # Ziehen möglich
+        if row + 1 < 8:
+            if board.squares[row + 1, col] is None: # Ziehen möglich
+                if (row + 1) == 7:
+                    legal_moves.append((row + 1, col, False, self, True))
+                else:
+                    legal_moves.append((row + 1, col, False, self, False))
             else:
-                blocked_by.append((row - 1, col, self))  # Von Spielfigur geblockt
+                blocked_by.append((row + 1, col, self))  # Von Spielfigur geblockt
 
         if 0 <= col -1 and col + 1 < 8:  # En-passant
             for (x, y) in [(row, col + 1), (row, col - 1)]:
-                target = board[x, y]
-                square = board[x - 1 , y]
-                if target.is_pawn and square is None:
-                    legal_moves.append((x - 1 , y, target, self))
+                target = board.squares[x, y]
+                square = board.squares[x + 1 , y]
+                if target is not None and target.is_pawn and target.color != self.color and square is None:
+                    legal_moves.append((x + 1 , y, target, self))
 
-        if (self.moved is False) and (board[row - 2, col] is None):
-            legal_moves.append((row - 2, col, False, self))  # Zwei Felder ziehen möglich
+        if (self.moved is False) and (board.squares[row + 2, col] is None):
+            legal_moves.append((row + 2, col, False, self))  # Zwei Felder ziehen möglich
 
-        for (x, y) in [(row - 1, col + 1), (row - 1, col - 1)]:
+        for (x, y) in [(row + 1, col +1), (row + 1, col - 1)]:
             if (0 <= x < 8 and 0 <= y < 8):
-                target = board[x, y]
-                if target is not None:
+                target = board.squares[x, y]
+                if target is not None and target.color != self.color:
                     legal_moves.append((x, y, target, self))  # Schlagen möglich
 
         return legal_moves, blocked_by
 
     def __str__(self):
         return "♟"
+    
+
+class WhitePawn(Piece):
+    """ Weißer Bauer """
+
+    def __init__(self, color: str, position: tuple):
+        super().__init__(color, position, notation='P', is_pawn=True)
+        self.moved = False
+        self.moved_2_once = False
+    
+    def get_image_path(self) -> str:
+        return f'pieces/{self.color}_pawn.png'
+
+    def get_legal_moves(self, board: 'bd.Board') -> tuple[list, list]:
+        """
+        Gibt alle legalen Züge des Bauers zurück.
+        :param board: 2D np.array mit Figurenobjekten oder None
+        :return: Tuple (legal_moves, blocked_by)
+        """
+        legal_moves = []
+        blocked_by = []
+
+        row, col = self.position
+
+        if 0 <= row - 1:
+            if board.squares[row - 1, col] is None:
+                if (row -1) == 0:
+                    legal_moves.append((row - 1, col, False, self, True))
+                else:
+                    legal_moves.append((row - 1, col, False, self, False))  # Ziehen möglich
+            else:
+                blocked_by.append((row - 1, col, self))  # Von Spielfigur geblockt
+
+        if 0 <= col -1 and col + 1 < 8:  # En-passant
+            for (x, y) in [(row, col + 1), (row, col - 1)]:
+                target = board.squares[x, y]
+                square = board.squares[x - 1 , y]
+                if target is not None and target.is_pawn and target.color != self.color and square is None:
+                    legal_moves.append((x - 1 , y, target, self))
+
+        if (self.moved is False) and (board.squares[row - 2, col] is None):
+            legal_moves.append((row - 2, col, False, self))  # Zwei Felder ziehen möglich
+
+        for (x, y) in [(row - 1, col + 1), (row - 1, col - 1)]:
+            if (0 <= x < 8 and 0 <= y < 8):
+                target = board.squares[x, y]
+                if target is not None and target.color != self.color:
+                    legal_moves.append((x, y, target, self))  # Schlagen möglich
+
+        return legal_moves, blocked_by
+
+    def __str__(self):
+        return "♙"
+

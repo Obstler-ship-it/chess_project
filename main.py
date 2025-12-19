@@ -1,12 +1,6 @@
-import logging
-from game_controller import GameController
+"""Haupteinstiegspunkt für das Schachspiel."""
 
-def main():
-    logging.basicConfig(level=logging.INFO, 
-                       format='%(asctime)s - %(levelname)s - %(message)s')
-    
-    controller = GameController()
-    controller.run()
+from kivy_main import ChessApp
 
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    ChessApp().run()

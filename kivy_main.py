@@ -80,7 +80,7 @@ class ChessSquare(BoxLayout):
         """Zeigt einen Punkt auf dem Feld (legal move)."""
         # Draw in canvas.after to be above background but under children widgets
         with self.canvas.after:
-            Color(0.2, 0.8, 0.3, 0.9)
+            Color(0.2, 0.2, 0.2, 0.8)  # Dunkelgrau mit 80% Deckkraft
             d = min(self.width, self.height) * 0.25
             self.dot = Ellipse(pos=(self.x + self.width / 2 - d / 2,
                                     self.y + self.height / 2 - d / 2),
@@ -182,37 +182,64 @@ class ChessBoard(GridLayout):
     def set_board(self, board_obj):
         """Setzt Referenz auf das Board-Objekt (für legal_moves)."""
         self.board_obj = board_obj
+    
+    def set_controller(self, controller):
+        """
+        Setzt Referenz auf den GameController.
+        
+        Ab jetzt werden alle Klicks über den Controller geleitet,
+        der dann entscheidet, was zu tun ist.
+        
+        Args:
+            controller: GameController Instanz
+        """
+        self.controller = controller
 
     def clear_highlights(self):
         for sq in self.squares.values():
             sq.clear_highlight()
 
     def _on_square_pressed(self, row, col):
-        """Bei Klick auf ein Feld: mögliche Züge für die Figur zeigen."""
-        # Nur anzeigen, wenn eine Figur vorhanden ist und Board-Objekt existiert
-        if self.board_obj is None:
-            return
-        piece = self.board_obj.squares[row, col]
-        # Leere vorherige Markierungen
-        self.clear_highlights()
-        if not piece:
-            return
-        try:
-            moves = piece.get_legal_moves(self.board_obj)
-        except Exception:
-            moves = []
-        # Erwartet Liste von (r, c)
-        for mv in moves:
-            if isinstance(mv, (tuple, list)) and len(mv) == 2:
-                r, c = mv
-                if (r, c) in self.squares:
-                    self.squares[(r, c)].add_highlight_dot()
+        """
+        Bei Klick auf ein Feld: Controller benachrichtigen.
+        
+        Statt selbst die Logik zu implementieren, delegieren wir
+        an den Controller. Der Controller entscheidet dann:
+        - Figur auswählen?
+        - Zug ausführen?
+        - Auswahl aufheben?
+        
+        Das ist das "Observer Pattern" - das Widget beobachtet Klicks
+        und informiert den Controller (Observer).
+        """
+        # Falls Controller gesetzt ist, diesen nutzen
+        if hasattr(self, 'controller') and self.controller:
+            self.controller.on_square_clicked(row, col)
+        
+        # Alte Logik als Fallback (für Rückwärtskompatibilität)
+        elif self.board_obj is not None:
+            piece = self.board_obj.squares[row, col]
+            # Leere vorherige Markierungen
+            self.clear_highlights()
+            if not piece:
+                return
+            try:
+                moves = piece.get_legal_moves(self.board_obj)
+            except Exception:
+                moves = []
+            # Erwartet Liste von (r, c)
+            for mv in moves:
+                if isinstance(mv, (tuple, list)) and len(mv) == 2:
+                    r, c = mv
+                    if (r, c) in self.squares:
+                        self.squares[(r, c)].add_highlight_dot()
 
 
 class StartMenuScreen(Screen):
     """Start-Menü mit New Game, Settings, Quit Buttons."""
-    def __init__(self, **kwargs):
+    def __init__(self, controller=None, **kwargs):
         super().__init__(**kwargs)
+        self.controller = controller
         # Semi-transparent dark background (like Pause menu)
         with self.canvas.before:
             Color(0, 0, 0, 0.85)
@@ -298,13 +325,22 @@ class StartMenuScreen(Screen):
         self.add_widget(main_layout)
     
     def start_game(self, instance):
-        self.manager.current = 'player_selection'
+        if self.controller:
+            self.controller.go_to_player_selection()
+        else:
+            self.manager.current = 'player_selection'
     
     def open_stats(self, instance):
-        self.manager.current = 'stats_menu'
+        if self.controller:
+            self.controller.go_to_stats_menu()
+        else:
+            self.manager.current = 'stats_menu'
     
     def quit_app(self, instance):
-        App.get_running_app().stop()
+        if self.controller:
+            self.controller.quit_app()
+        else:
+            App.get_running_app().stop()
 
     def _update_panel(self, instance, value):
         self.panel_rect.pos = instance.pos
@@ -317,8 +353,9 @@ class StartMenuScreen(Screen):
 
 class PlayerSelectionScreen(Screen):
     """Screen zur Auswahl/Registrierung beider Spieler."""
-    def __init__(self, **kwargs):
+    def __init__(self, controller=None, **kwargs):
         super().__init__(**kwargs)
+        self.controller = controller
         self.db = DatabaseManager()
 
         # Dunkler, halbtransparenter Hintergrund wie im Pause-Menü
@@ -533,21 +570,27 @@ class PlayerSelectionScreen(Screen):
                 self._show_popup('Fehler', 'Bitte gültige Zahl für Zeit eingeben!')
                 return
         
-        # Spieler-Infos und Timer an GameScreen übergeben
-        game_screen = self.manager.get_screen('game')
-        game_screen.set_players(white_player, black_player, use_timer, time_per_player)
+        # Spieler-Infos an Controller übergeben und Spiel starten
+        if self.controller:
+            self.controller.set_players(white_player, black_player, use_timer, time_per_player)
+            # WICHTIG: start_new_game() VOR go_to_game() aufrufen!
+            self.controller.start_new_game()
+            self.controller.go_to_game()
+        else:
+            self.manager.current = 'game'
         
         # Eingabefelder leeren
         self.white_input.text = ''
         self.black_input.text = ''
         self.timer_checkbox.active = False
         self.time_input.text = '10'
-        
-        self.manager.current = 'game'
     
     def go_back(self, instance):
         """Zurück zum Hauptmenü."""
-        self.manager.current = 'menu'
+        if self.controller:
+            self.controller.go_to_menu()
+        else:
+            self.manager.current = 'menu'
     
     def _show_popup(self, title, message):
         """Zeigt ein Popup-Fenster an."""
@@ -567,8 +610,10 @@ class PlayerSelectionScreen(Screen):
 
 class GameScreen(Screen):
     """Spiel-Screen mit Schachbrett und Pause-Button."""
-    def __init__(self, **kwargs):
+    def __init__(self, controller=None, **kwargs):
         super().__init__(**kwargs)
+        self.controller = controller  # Referenz zum GameController
+        
         # Dunkler Hintergrundton wie die Menüs
         with self.canvas.before:
             Color(0.1, 0.1, 0.15, 1)
@@ -722,7 +767,12 @@ class GameScreen(Screen):
         self.black_player = None
         self.use_timer = False
         self.time_per_player = None
-        self.game_controller = None
+        
+        # Controller-Integration (wenn übergeben)
+        if self.controller:
+            self.controller.set_board_widget(self.board)
+            self.controller.set_game_screen(self)
+            self.board.set_controller(self.controller)
     
     def _update_white_timer_bg(self, instance, value):
         self.white_timer_bg.pos = instance.pos
@@ -751,6 +801,10 @@ class GameScreen(Screen):
         self.use_timer = use_timer
         self.time_per_player = time_per_player
         
+        # Controller informieren
+        if self.controller:
+            self.controller.set_players(white_player, black_player, use_timer, time_per_player)
+        
         self.info_label.text = f"{white_player['username']} (Weiß) vs {black_player['username']} (Schwarz)"
         
         # Timer aktualisieren
@@ -761,21 +815,68 @@ class GameScreen(Screen):
         else:
             self.white_timer_label.text = "Weiß: --:--"
             self.black_timer_label.text = "Schwarz: --:--"
+    
+    def update_turn_info(self, current_turn):
+        """
+        Aktualisiert die Info-Anzeige, wer am Zug ist.
         
-        # Initialisiere GameController und lade Board
-        self.game_controller = GameController()
-        # Referenz auf Board für legal_moves und Anzeige aktualisieren
-        self.board.set_board(self.game_controller.board)
-        self.board.update_board(self.game_controller.board.squares)
+        Diese Methode wird vom Controller aufgerufen, wenn sich
+        der aktuelle Spieler ändert.
+        
+        Args:
+            current_turn: 'white' oder 'black'
+        """
+        if current_turn == 'white':
+            if self.white_player:
+                self.info_label.text = f"{self.white_player['username']} (Weiß) am Zug"
+            else:
+                self.info_label.text = "Weiß am Zug"
+        else:
+            if self.black_player:
+                self.info_label.text = f"{self.black_player['username']} (Schwarz) am Zug"
+            else:
+                self.info_label.text = "Schwarz am Zug"
+    
+    def update_move_history(self, move_history):
+        """
+        Aktualisiert die Zughistorie-Anzeige.
+        
+        Diese Methode wird vom Controller aufgerufen, wenn ein Zug
+        gemacht wurde.
+        
+        Args:
+            move_history: Liste von Zug-Dictionaries
+        """
+        if not move_history:
+            self.history_label.text = 'Noch keine Züge'
+            return
+        
+        # Formatiere Züge in lesbarer Form
+        text = ""
+        for i, move in enumerate(move_history, 1):
+            notation = self.game_controller.get_move_notation(move)
+            
+            # Zeige als Zugpaar (weiß + schwarz)
+            if i % 2 == 1:
+                move_number = (i + 1) // 2
+                text += f"{move_number}. {notation}"
+            else:
+                text += f" {notation}\n"
+        
+        self.history_label.text = text
     
     def show_pause_menu(self, instance):
-        self.manager.current = 'pause'
+        if self.controller:
+            self.controller.go_to_pause_menu()
+        else:
+            self.manager.current = 'pause'
 
 
 class StatsMenuScreen(Screen):
     """Menü für Statistiken und Historie."""
-    def __init__(self, **kwargs):
+    def __init__(self, controller=None, **kwargs):
         super().__init__(**kwargs)
+        self.controller = controller
         # Semi-transparent dark overlay matching Pause/Start
         with self.canvas.before:
             Color(0, 0, 0, 0.85)
@@ -859,13 +960,22 @@ class StatsMenuScreen(Screen):
         self.add_widget(main_layout)
     
     def show_leaderboard(self, instance):
-        self.manager.current = 'leaderboard'
+        if self.controller:
+            self.controller.go_to_leaderboard()
+        else:
+            self.manager.current = 'leaderboard'
     
     def show_game_history(self, instance):
-        self.manager.current = 'game_history'
+        if self.controller:
+            self.controller.go_to_game_history()
+        else:
+            self.manager.current = 'game_history'
     
     def go_back(self, instance):
-        self.manager.current = 'menu'
+        if self.controller:
+            self.controller.go_to_menu()
+        else:
+            self.manager.current = 'menu'
     
     def _update_panel(self, instance, value):
         self.panel_rect.pos = instance.pos
@@ -878,8 +988,9 @@ class StatsMenuScreen(Screen):
 
 class LeaderboardScreen(Screen):
     """Ranglisten-Anzeige."""
-    def __init__(self, **kwargs):
+    def __init__(self, controller=None, **kwargs):
         super().__init__(**kwargs)
+        self.controller = controller
         self.db = DatabaseManager()
         
         layout = BoxLayout(orientation='vertical', padding=30, spacing=15)
@@ -1037,13 +1148,17 @@ class LeaderboardScreen(Screen):
             self.leaderboard_container.add_widget(row)
     
     def go_back(self, instance):
-        self.manager.current = 'stats_menu'
+        if self.controller:
+            self.controller.go_to_stats_menu()
+        else:
+            self.manager.current = 'stats_menu'
 
 
 class GameHistoryScreen(Screen):
     """Spielhistorie-Anzeige."""
-    def __init__(self, **kwargs):
+    def __init__(self, controller=None, **kwargs):
         super().__init__(**kwargs)
+        self.controller = controller
         self.db = DatabaseManager()
         
         layout = BoxLayout(orientation='vertical', padding=30, spacing=15)
@@ -1120,13 +1235,17 @@ class GameHistoryScreen(Screen):
         self.history_label.text = text
     
     def go_back(self, instance):
-        self.manager.current = 'stats_menu'
+        if self.controller:
+            self.controller.go_to_stats_menu()
+        else:
+            self.manager.current = 'stats_menu'
 
 
 class PauseMenuScreen(Screen):
     """Pause-Menü mit Resume, Restart, Main Menu."""
-    def __init__(self, **kwargs):
+    def __init__(self, controller=None, **kwargs):
         super().__init__(**kwargs)
+        self.controller = controller
         
         # Semi-transparent background mit Blur-Effekt
         with self.canvas.before:
@@ -1233,17 +1352,30 @@ class PauseMenuScreen(Screen):
         self.bg_rect.size = self.size
     
     def resume_game(self, instance):
-        self.manager.current = 'game'
+        if self.controller:
+            self.controller.go_to_game()
+        else:
+            self.manager.current = 'game'
     
     def restart_game(self, instance):
-        # Hier später Spiellogik zurücksetzen
-        self.manager.current = 'game'
+        # Spiel über Controller neu starten
+        if self.controller:
+            self.controller.start_new_game()
+            self.controller.go_to_game()
+        else:
+            self.manager.current = 'game'
     
     def go_to_menu(self, instance):
-        self.manager.current = 'menu'
+        if self.controller:
+            self.controller.go_to_menu()
+        else:
+            self.manager.current = 'menu'
     
     def quit_app(self, instance):
-        App.get_running_app().stop()
+        if self.controller:
+            self.controller.quit_app()
+        else:
+            App.get_running_app().stop()
 
 
 class ChessApp(App):
@@ -1253,17 +1385,21 @@ class ChessApp(App):
         # Screen Manager
         sm = ScreenManager()
         
-        # Screens hinzufügen
-        sm.add_widget(StartMenuScreen(name='menu'))
-        sm.add_widget(PlayerSelectionScreen(name='player_selection'))
-        sm.add_widget(GameScreen(name='game'))
-        sm.add_widget(PauseMenuScreen(name='pause'))
-        sm.add_widget(StatsMenuScreen(name='stats_menu'))
-        sm.add_widget(LeaderboardScreen(name='leaderboard'))
-        sm.add_widget(GameHistoryScreen(name='game_history'))
+        # GameController erstellen (verwaltet Navigation und Spiellogik)
+        self.game_controller = GameController(sm)
+        
+        # Screens hinzufügen und Controller übergeben
+        sm.add_widget(StartMenuScreen(name='menu', controller=self.game_controller))
+        sm.add_widget(PlayerSelectionScreen(name='player_selection', controller=self.game_controller))
+        sm.add_widget(GameScreen(name='game', controller=self.game_controller))
+        sm.add_widget(PauseMenuScreen(name='pause', controller=self.game_controller))
+        sm.add_widget(StatsMenuScreen(name='stats_menu', controller=self.game_controller))
+        sm.add_widget(LeaderboardScreen(name='leaderboard', controller=self.game_controller))
+        sm.add_widget(GameHistoryScreen(name='game_history', controller=self.game_controller))
         
         return sm
 
 
 if __name__ == "__main__":
     ChessApp().run()
+
