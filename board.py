@@ -1,8 +1,8 @@
 """ Diese Klasse stellt das Schachbrett mit allen Figuren als numpy 8x8 Array dar"""
 
 import numpy as np
-from pieces import Piece, Pawn, Rook, Knight, Bishop, Queen, King
-from engine.alpha_beta import AlphaBetaSuche
+from pieces import Piece, BlackPawn, WhitePawn, LeftRook, RightRook, Knight, Queen, King, Bishop
+
 
 class Board:
     """ Repräsentiert das Schachbrett
@@ -19,14 +19,14 @@ class Board:
         """ Erzeugt die Startaufstellung eines Schachbrettes """
 		# Pawns
         for col in range(8):
-            self.squares[1, col] = Pawn('black', (1, col))
-            self.squares[6, col] = Pawn('white', (6, col))
+            self.squares[1, col] = BlackPawn('black', (1, col))
+            self.squares[6, col] = WhitePawn('white', (6, col))
 
         # Rooks
-        self.squares[0, 0] = Rook('black', (0, 0))
-        self.squares[0, 7] = Rook('black', (0, 7))
-        self.squares[7, 0] = Rook('white', (7, 0))
-        self.squares[7, 7] = Rook('white', (7, 7))
+        self.squares[0, 0] = BlackPawn('black', (0, 0))
+        self.squares[0, 7] = RightRook('black', (0, 7))
+        self.squares[7, 0] = LeftRook('white', (7, 0))
+        self.squares[7, 7] = RightRook('white', (7, 7))
 
         # Knights
         self.squares[0, 1] = Knight('black', (0, 1))
@@ -46,23 +46,22 @@ class Board:
         self.squares[0, 4] = King('black', (0, 4))
         self.squares[7, 4] = King('white', (7, 4))
 
-    def show_legal_moves(self):
-
-    @staticmethod
-    def valid_position(position: tuple) -> bool:
-        if (0 <= position[0] < 8 and 0 <= position[1] < 8):
-            return True  
-
-    def make_move(self, figur: Piece, next_position: tuple) -> bool:
+    def make_move(self, piece: Piece, next_position: tuple, target: Piece) -> bool:
         """ Zieht eine Figur auf dem Schachfeld """
-        position = next_position
-        if (0 <= position[0] < 8 and 0 <= position[1] < 8):
-            figur.move_to = next_position
+        row, col = piece.position
+        if (0 <= row < 8 and 0 <= col < 8):
+            self.squares[row, col] = None
+            self.squares[row, col] = piece
+            piece.move_to = next_position
 
     def __str__(self):
-        """ Ausgabe des Schachbrettes """
         display = ""
         for row in self.squares:
             display += " ".join(str(cell) if cell is not None else "." for cell in row)
             display += "\n"
         return display
+
+    
+if __name__ == "__main__":
+    k = Board()
+    print(k)

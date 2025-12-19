@@ -1,12 +1,11 @@
 import logging
 from board import Board
-from player import HumanPlayer, AIPlayer
 
 class Game:
 	def __init__(self):
 		self.board = Board()
 		# Weiß beginnt
-		self.players = [HumanPlayer('white'), AIPlayer('black')]
+		self.players = [Player1('white'), Player2('black')]
 		self.current = 0
 
 	def play(self, max_moves=20):
