@@ -8,7 +8,7 @@ from kivy.uix.textinput import TextInput
 from kivy.uix.spinner import Spinner
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.uix.image import Image
-from kivy.graphics import Color, Rectangle
+from kivy.graphics import Color, Rectangle, Ellipse
 from kivy.core.window import Window
 from kivy.uix.popup import Popup
 import sys
@@ -23,6 +23,8 @@ class ChessSquare(BoxLayout):
         super().__init__(**kwargs)
         self.light = light
         self.piece = piece
+        self.press_callback = None
+        self.dot = None  # Ellipse highlight for legal move
         self.bind(pos=self.update_rect, size=self.update_rect)
 
         with self.canvas.before:
@@ -44,6 +46,12 @@ class ChessSquare(BoxLayout):
     def update_rect(self, *args):
         self.rect.pos = self.pos
         self.rect.size = self.size
+        # Reposition highlight dot if present
+        if self.dot is not None:
+            d = min(self.width, self.height) * 0.25
+            self.dot.pos = (self.x + self.width / 2 - d / 2,
+                            self.y + self.height / 2 - d / 2)
+            self.dot.size = (d, d)
     
     def set_piece(self, piece):
         """Setzt oder aktualisiert die Figur auf diesem Feld."""
@@ -57,6 +65,34 @@ class ChessSquare(BoxLayout):
             )
             self.add_widget(self.piece_image)
 
+    def set_press_callback(self, callback):
+        """Setzt Callback, der bei Klick auf das Feld ausgelöst wird."""
+        self.press_callback = callback
+
+    def on_touch_down(self, touch):
+        if self.collide_point(*touch.pos):
+            if callable(self.press_callback):
+                self.press_callback(self)
+                return True
+        return super().on_touch_down(touch)
+
+    def add_highlight_dot(self):
+        """Zeigt einen Punkt auf dem Feld (legal move)."""
+        # Draw in canvas.after to be above background but under children widgets
+        with self.canvas.after:
+            Color(0.2, 0.8, 0.3, 0.9)
+            d = min(self.width, self.height) * 0.25
+            self.dot = Ellipse(pos=(self.x + self.width / 2 - d / 2,
+                                    self.y + self.height / 2 - d / 2),
+                               size=(d, d))
+
+    def clear_highlight(self):
+        """Entfernt den Punkt vom Feld, falls vorhanden."""
+        if self.dot is not None:
+            # Remove by clearing canvas.after and resetting
+            self.canvas.after.clear()
+            self.dot = None
+
 
 class ChessBoard(GridLayout):
     """10×10 Brett mit dünnem Rahmen & Koordinaten."""
@@ -67,6 +103,7 @@ class ChessBoard(GridLayout):
         self.spacing = 0.2  # Minimaler Rahmen
         self.padding = 0.2  # Minimaler Rahmen
         self.board_array = board_array  # numpy array mit Piece-Objekten
+        self.board_obj = None  # Referenz auf Board-Objekt für legal_moves
         self.squares = {}  # Dictionary zur Speicherung der ChessSquare-Widgets
         
         # Rahmen-Hintergrund (dunkle Metallfarbe)
@@ -124,6 +161,8 @@ class ChessBoard(GridLayout):
                     
                     square = ChessSquare(is_light, piece)
                     self.squares[(board_row, board_col)] = square
+                    # Klick-Handler setzen
+                    square.set_press_callback(lambda _sq, r=board_row, c=board_col: self._on_square_pressed(r, c))
                     self.add_widget(square)
                 else:
                     self.add_widget(Label(text=""))
@@ -139,6 +178,35 @@ class ChessBoard(GridLayout):
         for (row, col), square in self.squares.items():
             piece = board_array[row, col] if board_array is not None else None
             square.set_piece(piece)
+
+    def set_board(self, board_obj):
+        """Setzt Referenz auf das Board-Objekt (für legal_moves)."""
+        self.board_obj = board_obj
+
+    def clear_highlights(self):
+        for sq in self.squares.values():
+            sq.clear_highlight()
+
+    def _on_square_pressed(self, row, col):
+        """Bei Klick auf ein Feld: mögliche Züge für die Figur zeigen."""
+        # Nur anzeigen, wenn eine Figur vorhanden ist und Board-Objekt existiert
+        if self.board_obj is None:
+            return
+        piece = self.board_obj.squares[row, col]
+        # Leere vorherige Markierungen
+        self.clear_highlights()
+        if not piece:
+            return
+        try:
+            moves = piece.get_legal_moves(self.board_obj)
+        except Exception:
+            moves = []
+        # Erwartet Liste von (r, c)
+        for mv in moves:
+            if isinstance(mv, (tuple, list)) and len(mv) == 2:
+                r, c = mv
+                if (r, c) in self.squares:
+                    self.squares[(r, c)].add_highlight_dot()
 
 
 class StartMenuScreen(Screen):
@@ -696,6 +764,8 @@ class GameScreen(Screen):
         
         # Initialisiere GameController und lade Board
         self.game_controller = GameController()
+        # Referenz auf Board für legal_moves und Anzeige aktualisieren
+        self.board.set_board(self.game_controller.board)
         self.board.update_board(self.game_controller.board.squares)
     
     def show_pause_menu(self, instance):
@@ -706,60 +776,87 @@ class StatsMenuScreen(Screen):
     """Menü für Statistiken und Historie."""
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        
-        layout = BoxLayout(orientation='vertical', padding=50, spacing=20)
-        
-        # Titel
+        # Semi-transparent dark overlay matching Pause/Start
+        with self.canvas.before:
+            Color(0, 0, 0, 0.85)
+            self.bg_rect = Rectangle(pos=self.pos, size=self.size)
+        self.bind(pos=self.update_bg, size=self.update_bg)
+
+        # Main layout
+        main_layout = BoxLayout(orientation='vertical', padding=[150, 100, 150, 100], spacing=30)
+
+        # Centered panel
+        panel = BoxLayout(orientation='vertical', spacing=20)
+        with panel.canvas.before:
+            Color(0.15, 0.15, 0.2, 0.95)
+            self.panel_rect = Rectangle()
+        panel.bind(pos=self._update_panel, size=self._update_panel)
+
+        # Title
+        title_box = BoxLayout(orientation='vertical', size_hint=(1, 0.2), padding=[0, 20, 0, 10])
         title = Label(
-            text='Statistiken & Historie',
-            font_size='36sp',
-            size_hint=(1, 0.2),
-            bold=True
+            text='STATISTIKEN & HISTORIE',
+            font_size='48sp',
+            size_hint=(1, 1),
+            bold=True,
+            color=(0.9, 0.9, 1, 1)
         )
-        layout.add_widget(title)
-        
-        # Button Container
+        title_box.add_widget(title)
+        panel.add_widget(title_box)
+
+        # Separator
+        separator = Widget(size_hint=(1, 0.02))
+        with separator.canvas:
+            Color(0.4, 0.4, 0.5, 1)
+            self.sep_rect_stats = Rectangle()
+        separator.bind(pos=lambda i, v: setattr(self.sep_rect_stats, 'pos', (i.x + i.width * 0.2, i.y)),
+                       size=lambda i, v: setattr(self.sep_rect_stats, 'size', (i.width * 0.6, 2)))
+        panel.add_widget(separator)
+
+        # Button container
         button_container = BoxLayout(
             orientation='vertical',
-            spacing=15,
-            size_hint=(1, 0.6),
-            padding=[150, 0, 150, 0]
+            spacing=20,
+            size_hint=(1, 0.68),
+            padding=[80, 20, 80, 20]
         )
-        
-        # Rangliste Button
+
+        # Leaderboard - Blue
         leaderboard_btn = Button(
             text='Rangliste',
-            font_size='24sp',
+            font_size='26sp',
             size_hint=(1, 0.33),
-            background_color=(0.2, 0.6, 0.2, 1)
+            background_color=(0.3, 0.4, 0.7, 1),
+            bold=True
         )
         leaderboard_btn.bind(on_press=self.show_leaderboard)
         button_container.add_widget(leaderboard_btn)
-        
-        # Spielhistorie Button
+
+        # Game history - Blue (slightly different hue)
         history_btn = Button(
             text='Spielhistorie',
-            font_size='24sp',
+            font_size='26sp',
             size_hint=(1, 0.33),
-            background_color=(0.3, 0.5, 0.6, 1)
+            background_color=(0.3, 0.5, 0.7, 1),
+            bold=True
         )
         history_btn.bind(on_press=self.show_game_history)
         button_container.add_widget(history_btn)
-        
-        # Zurück Button
+
+        # Back - Red
         back_btn = Button(
             text='Zurück',
-            font_size='24sp',
+            font_size='26sp',
             size_hint=(1, 0.33),
-            background_color=(0.6, 0.3, 0.3, 1)
+            background_color=(0.7, 0.2, 0.2, 1),
+            bold=True
         )
         back_btn.bind(on_press=self.go_back)
         button_container.add_widget(back_btn)
-        
-        layout.add_widget(button_container)
-        layout.add_widget(Widget(size_hint=(1, 0.2)))
-        
-        self.add_widget(layout)
+
+        panel.add_widget(button_container)
+        main_layout.add_widget(panel)
+        self.add_widget(main_layout)
     
     def show_leaderboard(self, instance):
         self.manager.current = 'leaderboard'
@@ -769,6 +866,14 @@ class StatsMenuScreen(Screen):
     
     def go_back(self, instance):
         self.manager.current = 'menu'
+    
+    def _update_panel(self, instance, value):
+        self.panel_rect.pos = instance.pos
+        self.panel_rect.size = instance.size
+    
+    def update_bg(self, *args):
+        self.bg_rect.pos = self.pos
+        self.bg_rect.size = self.size
 
 
 class LeaderboardScreen(Screen):
