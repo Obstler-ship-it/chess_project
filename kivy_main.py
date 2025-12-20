@@ -28,14 +28,13 @@ class ChessSquare(BoxLayout):
         self.bind(pos=self.update_rect, size=self.update_rect)
 
         with self.canvas.before:
-            # deutlich neutralere Farben
             if self.light:
                 Color(0.9, 0.9, 0.95)
             else:
                 Color(0.45, 0.55, 0.75)
             self.rect = Rectangle()
         
-        # Füge Figurenbild hinzu, falls vorhanden
+        # Füge Figurenbild hinzu
         if piece:
             self.piece_image = Image(
                 source=piece.get_image_path(),
@@ -44,9 +43,9 @@ class ChessSquare(BoxLayout):
             self.add_widget(self.piece_image)
 
     def update_rect(self, *args):
+        """ Zentralisiert die Mitte des Schachbrettes """
         self.rect.pos = self.pos
         self.rect.size = self.size
-        # Reposition highlight dot if present
         if self.dot is not None:
             d = min(self.width, self.height) * 0.25
             self.dot.pos = (self.x + self.width / 2 - d / 2,
@@ -541,6 +540,10 @@ class PlayerSelectionScreen(Screen):
         black_name = self.black_input.text.strip()
         
         # Validierung
+        if not white_name and not black_name:
+            self._show_popup('Fehler', 'Bitte Benutzername für beide Spieler eingeben!')
+            return
+
         if not white_name:
             self._show_popup('Fehler', 'Bitte Benutzername für weißen Spieler eingeben!')
             return
@@ -553,9 +556,13 @@ class PlayerSelectionScreen(Screen):
             self._show_popup('Fehler', 'Bitte zwei verschiedene Spieler eingeben!')
             return
         
+        if len(white_name) < 3 or len(black_name) < 3:
+            self._show_popup('Fehler', 'Der Benutzername muss mindestens drei Zeichen enthalten!')
+            return
+        
         # Spieler holen oder erstellen
-        white_player = self._get_or_create_player(white_name)
-        black_player = self._get_or_create_player(black_name)
+        white_player = self._get_or_create_player(white_name), white_name
+        black_player = self._get_or_create_player(black_name), black_name
         
         # Timer-Einstellungen
         use_timer = self.timer_checkbox.active
@@ -805,7 +812,7 @@ class GameScreen(Screen):
         if self.controller:
             self.controller.set_players(white_player, black_player, use_timer, time_per_player)
         
-        self.info_label.text = f"{white_player['username']} (Weiß) vs {black_player['username']} (Schwarz)"
+        self.info_label.text = f"{white_player[1]} (Weiß) vs {black_player[1]} (Schwarz)"
         
         # Timer aktualisieren
         if use_timer and time_per_player:
@@ -830,7 +837,7 @@ class GameScreen(Screen):
             if self.white_player:
                 self.info_label.text = f"{self.white_player['username']} (Weiß) am Zug"
             else:
-                self.info_label.text = "Weiß am Zug"
+                self.info_label.text = "Weiß ist am Zug"
         else:
             if self.black_player:
                 self.info_label.text = f"{self.black_player['username']} (Schwarz) am Zug"
@@ -854,7 +861,7 @@ class GameScreen(Screen):
         # Formatiere Züge in lesbarer Form
         text = ""
         for i, move in enumerate(move_history, 1):
-            notation = self.game_controller.get_move_notation(move)
+            notation = self.controller.get_move_notation(move)
             
             # Zeige als Zugpaar (weiß + schwarz)
             if i % 2 == 1:
@@ -1386,7 +1393,7 @@ class ChessApp(App):
         sm = ScreenManager()
         
         # GameController erstellen (verwaltet Navigation und Spiellogik)
-        self.game_controller = GameController(sm)
+        self.game_controller = GameController(sm, app=self)
         
         # Screens hinzufügen und Controller übergeben
         sm.add_widget(StartMenuScreen(name='menu', controller=self.game_controller))

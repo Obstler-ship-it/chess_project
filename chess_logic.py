@@ -58,7 +58,7 @@ class chess_logik:
         :param: last_move, Move-Objekt des letzten Zugs (für En passant)
         :return: Liste aller legalen Züge
         """
-        pass
+        return
 
 
     def ispawn_promotion(self):

@@ -30,7 +30,7 @@ class GameController:
     Design Pattern: Application Controller + Mediator
     """
     
-    def __init__(self, screen_manager):
+    def __init__(self, screen_manager, app):
         """
         Initialisiert Controller.
         
@@ -41,6 +41,7 @@ class GameController:
         
         # App-Zustand
         self.current_screen = 'menu'  # Aktueller Screen
+        self.app = app
         
         # Spielzustand (nur während aktiven Spiels)
         self.board = None
@@ -100,8 +101,7 @@ class GameController:
     
     def quit_app(self):
         """Beendet die App."""
-        from kivy.app import App
-        App.get_running_app().stop()
+        self.app.stop()
     
     # ==================== Spiel-Management ====================
     
@@ -313,7 +313,7 @@ class GameController:
         )
         
         # Zug im Board ausführen
-        self.board.execute_move(move)
+        self.board.make_move(move)
         
         # last_move speichern
         self.last_move = move
@@ -360,15 +360,11 @@ class GameController:
         Returns:
             String mit Zugnotation
         """
-        from_row, from_col = move.from_pos
         to_row, to_col = move.to_pos
+        symbol = move.piece.notation
         
-        # Notation erstellen
-        from_notation = chr(ord('a') + from_col) + str(8 - from_row)
         to_notation = chr(ord('a') + to_col) + str(8 - to_row)
-        
-        piece_name = type(move.piece).__name__
-        piece_symbol = piece_name[0] if 'Pawn' not in piece_name else ''
+        piece_symbol = symbol if symbol != 'P'  else ''
         capture_symbol = 'x' if move.captured else '-'
         
-        return f"{piece_symbol}{from_notation}{capture_symbol}{to_notation}"
+        return f"{piece_symbol}{capture_symbol}{to_notation}"

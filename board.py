@@ -2,6 +2,7 @@
 
 import numpy as np
 from pieces import Piece, BlackPawn, WhitePawn, LeftRook, RightRook, Knight, Queen, King, Bishop
+from move import Move
 
 
 class Board:
@@ -108,15 +109,20 @@ class Board:
             if piece in self.black_pieces:
                 self.black_pieces.remove(piece)
 
-    def make_move(self, piece: Piece, next_position: tuple, target: Piece = None) -> bool:
+    def make_move(self, last_move: Move) -> bool:
         """ Zieht eine Figur auf dem Schachfeld """
-        if target is not None:
-            self.remove_piece(target)
-        row, col = piece.position
+
+        piece = last_move.piece
+        new_pos = last_move.to_pos
+        captured = last_move.captured
+        row, col = new_pos
+
+        if captured is not None:
+            self.remove_piece(captured)
         if (0 <= row < 8 and 0 <= col < 8):
             self.squares[row, col] = None
             self.squares[row, col] = piece
-            piece.move_to = next_position
+            piece.move_to = new_pos
 
     def __str__(self):
         display = ""
