@@ -1,7 +1,7 @@
 """ Diese Klasse stellt das Schachbrett mit allen Figuren als numpy 8x8 Array dar"""
 
 import numpy as np
-from pieces import Piece, BlackPawn, WhitePawn, LeftRook, RightRook, Knight, Queen, King, Bishop
+from pieces import Piece, BlackPawn, WhitePawn, Rook, Knight, Queen, King, Bishop
 from move import Move
 
 
@@ -39,18 +39,18 @@ class Board:
             self.white_pieces.append(wp)
 
         # Rooks
-        blr = LeftRook('black', (0, 0))
-        brr = RightRook('black', (0, 7))
-        wlr = LeftRook('white', (7, 0))
-        wrr = RightRook('white', (7, 7))
+        br1 = Rook('black', (0, 0))
+        br2 = Rook('black', (0, 7))
+        wr1 = Rook('white', (7, 0))
+        wr2 = Rook('white', (7, 7))
         
-        self.squares[0, 0] = blr
-        self.squares[0, 7] = brr
-        self.squares[7, 0] = wlr
-        self.squares[7, 7] = wrr
+        self.squares[0, 0] = br1
+        self.squares[0, 7] = br2
+        self.squares[7, 0] = wr1
+        self.squares[7, 7] = wr2
         
-        self.black_pieces.extend([blr, brr])
-        self.white_pieces.extend([wlr, wrr])
+        self.black_pieces.extend([br1, br2])
+        self.white_pieces.extend([wr1, wr2])
 
         # Knights
         bn1 = Knight('black', (0, 1))
@@ -102,12 +102,15 @@ class Board:
     
     def remove_piece(self, piece: Piece):
         """Entfernt geschlagene Figur aus Listen."""
-        if piece.color == 'white':
-            if piece in self.white_pieces:
-                self.white_pieces.remove(piece)
+
+        if piece in self.white_pieces:
+            self.white_pieces.remove(piece)
+
+        elif piece in self.black_pieces:
+            self.black_pieces.remove(piece)
+
         else:
-            if piece in self.black_pieces:
-                self.black_pieces.remove(piece)
+            raise ValueError('Unknown Piece!')
 
     def make_move(self, last_move: Move) -> bool:
         """ Zieht eine Figur auf dem Schachfeld """
@@ -120,10 +123,6 @@ class Board:
         old_row, old_col = old_pos
         new_row, new_col = new_pos
 
-        # Entferne geschlagene Figur falls vorhanden
-        if captured is not None:
-            self.remove_piece(captured)
-
         # Führe den Zug aus
         if (0 <= new_row < 8 and 0 <= new_col < 8):
             # Alte Position leer setzen
@@ -134,6 +133,23 @@ class Board:
             
             # Position der Figur aktualisieren
             piece.move_to(new_pos)
+
+            # Entferne geschlagene Figur falls vorhanden
+            if captured:
+                self.remove_piece(captured)
+                # Wenn geschlagene Figur NICHT auf Zielfeld steht → En-passant!
+                if captured.position != new_pos:
+                    captured_row, captured_col = captured.position
+                    self.squares[captured_row, captured_col] = None
+            
+            # Setze moved-Flag für Türme, Könige und Bauern
+            if hasattr(piece, 'moved'):
+                piece.moved = True
+            
+            return True
+        
+        return False
+                piece.moved = True
 
     def __str__(self):
         display = ""

@@ -14,6 +14,7 @@ Trennung der Verantwortlichkeiten:
 
 from typing import Optional
 from board import Board
+from pieces import Piece
 from chess_logic import chess_logik
 from move import Move
 
@@ -140,7 +141,7 @@ class GameController:
         self.move_history = []
         
         # Berechne initiale legale Züge
-        self.valid_moves = self.chess_logic.starting_moves()  # Methode mit () aufrufen!
+        self.valid_moves = self.chess_logic.all_moves()  # Methode mit () aufrufen!
         
         # UI aktualisieren
         if self.board_widget:
@@ -187,7 +188,7 @@ class GameController:
             self.valid_moves = []
             return
         
-        result = self.chess_logic.all_legal_moves(self.last_move)
+        result = self.chess_logic.all_legal_moves(self.last_move, self.current_turn)
         # Fallback: Falls all_legal_moves() None zurückgibt, leere Liste verwenden
         self.valid_moves = result if result is not None else []
     
@@ -224,13 +225,13 @@ class GameController:
                 self._deselect_piece()
                 self._select_piece(piece)
             
-            # Klick auf legalen Zug -> Zug ausführen
-            elif self._is_valid_move(self.selected_piece, (row, col)):
-                self._execute_move(self.selected_piece, (row, col))
-            
-            # Klick auf illegales Feld -> Auswahl aufheben
             else:
-                self._deselect_piece()
+                valid, target = self._is_valid_move(self.selected_piece, (row, col))
+                if valid: # Klick auf legalen Zug -> Zug ausführen
+                    self._execute_move(self.selected_piece, (row, col), target)
+                else:
+                    # Klick auf illegales Feld -> Auswahl aufheben
+                    self._deselect_piece()
     
     def _select_piece(self, piece):
         """
@@ -245,9 +246,7 @@ class GameController:
         legal_positions = []
         for move_tuple in self.valid_moves:
             # Flexibles Unpacking: Bauern haben 5 Elemente (mit promotion), Rochade 6, andere 4
-            if len(move_tuple) == 5:
-                target_row, target_col, captured, move_piece = move_tuple[:4]
-            elif len(move_tuple) == 6:
+            if len(move_tuple) >= 5:
                 target_row, target_col, captured, move_piece = move_tuple[:4]
             else:
                 target_row, target_col, captured, move_piece = move_tuple
@@ -273,7 +272,7 @@ class GameController:
         if self.board_widget:
             self.board_widget.clear_highlights()
     
-    def _is_valid_move(self, piece, target_pos: tuple) -> bool:
+    def _is_valid_move(self, piece, target_pos: tuple) -> tuple:
         """
         Prüft ob Zug gültig ist (in valid_moves Liste).
         
@@ -286,17 +285,15 @@ class GameController:
         """
         row, col = target_pos
         for move_tuple in self.valid_moves:
-            # Flexibles Unpacking: Bauern haben 5 Elemente, andere 4
-            if len(move_tuple) == 5:
-                target_row, target_col, captured, move_piece, promotion = move_tuple
-            else:
-                target_row, target_col, captured, move_piece = move_tuple
-                
+            target_row, target_col = move_tuple[0:2]
+            captured = move_tuple[2]  # Geschlagene Figur (oder False)
+            move_piece = move_tuple[3]
+
             if move_piece == piece and (target_row, target_col) == (row, col):
-                return True
-        return False
+                return (True, captured)  # Gibt (valid, captured_piece) zurück
+        return (False, False)
     
-    def _execute_move(self, piece, target_pos: tuple):
+    def _execute_move(self, piece, target_pos: tuple, target: Piece):
         """
         Führt einen Zug aus und aktualisiert alles.
         
@@ -306,14 +303,13 @@ class GameController:
         """
         from_row, from_col = piece.position
         to_row, to_col = target_pos
-        target_piece = self.board.squares[to_row, to_col]
         
         # Move-Objekt erstellen
         move = Move(
             from_pos=(from_row, from_col),
             to_pos=(to_row, to_col),
             piece=piece,
-            captured=target_piece,
+            captured=target,
             promotion=None  # TODO: Bauern-Promotion implementieren
         )
         
@@ -330,6 +326,8 @@ class GameController:
         self.current_turn = 'black' if self.current_turn == 'white' else 'white'
         
         # Gültige Züge für nächsten Spieler berechnen
+        self.chess_logic.last_move(move)
+        self.chess_logic.all_legal_moves(move, self.current_turn)
         self._update_valid_moves()
         
         # Auswahl aufheben
