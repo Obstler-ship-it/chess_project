@@ -49,6 +49,7 @@ class GameController:
         self.current_turn = None
         self.selected_piece = None
         self.last_move: Optional[Move] = None
+        self.checkmate: tuple = None
         self.move_history = []
         self.valid_moves = []  # Alle gültigen Züge für aktuellen Spieler
         
@@ -135,6 +136,7 @@ class GameController:
         self.current_turn = 'white'
         self.selected_piece = None
         self.last_move = None
+        self.checkmate = None
         self.move_history = []
         
         # Berechne initiale legale Züge
@@ -143,7 +145,7 @@ class GameController:
         # UI aktualisieren
         if self.board_widget:
             self.board_widget.set_board(self.board)
-            self.board_widget.update_board(self.board.squares)
+            self.board_widget.update_board(self.board.squares, self.checkmate)
             self.board_widget.clear_highlights()
         
         if self.game_screen:
@@ -185,10 +187,7 @@ class GameController:
             self.valid_moves = []
             return
         
-        result = self.chess_logic.all_legal_moves(
-            self.current_turn, 
-            self.last_move
-        )
+        result = self.chess_logic.all_legal_moves(self.last_move)
         # Fallback: Falls all_legal_moves() None zurückgibt, leere Liste verwenden
         self.valid_moves = result if result is not None else []
     
@@ -245,21 +244,27 @@ class GameController:
         # Finde legale Positionen für diese Figur aus valid_moves
         legal_positions = []
         for move_tuple in self.valid_moves:
-            # Flexibles Unpacking: Bauern haben 5 Elemente (mit promotion), andere 4
+            # Flexibles Unpacking: Bauern haben 5 Elemente (mit promotion), Rochade 6, andere 4
             if len(move_tuple) == 5:
-                target_row, target_col, captured, move_piece, promotion = move_tuple
+                target_row, target_col, captured, move_piece = move_tuple[:4]
+            elif len(move_tuple) == 6:
+                target_row, target_col, captured, move_piece = move_tuple[:4]
             else:
                 target_row, target_col, captured, move_piece = move_tuple
             
             if move_piece == piece:
-                legal_positions.append((target_row, target_col))
+                legal_positions.append((target_row, target_col, captured))
         
         # UI aktualisieren: Highlights setzen
         if self.board_widget:
             self.board_widget.clear_highlights()
-            for row, col in legal_positions:
+            for row, col, captured in legal_positions:
                 if (row, col) in self.board_widget.squares:
-                    self.board_widget.squares[(row, col)].add_highlight_dot()
+                    # Rote Punkte für Schlagzüge, graue für normale Züge
+                    if captured:
+                        self.board_widget.squares[(row, col)].add_highlight_dot('red')
+                    else:
+                        self.board_widget.squares[(row, col)].add_highlight_dot('gray')
     
     def _deselect_piece(self):
         """Hebt die Auswahl auf und entfernt Highlights."""

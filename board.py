@@ -100,7 +100,7 @@ class Board:
         self.black_pieces.append(self.black_king)
         self.white_pieces.append(self.white_king)
     
-    def remove_piece(self, piece):
+    def remove_piece(self, piece: Piece):
         """Entfernt geschlagene Figur aus Listen."""
         if piece.color == 'white':
             if piece in self.white_pieces:
@@ -113,16 +113,27 @@ class Board:
         """ Zieht eine Figur auf dem Schachfeld """
 
         piece = last_move.piece
+        old_pos = last_move.from_pos
         new_pos = last_move.to_pos
         captured = last_move.captured
-        row, col = new_pos
+        
+        old_row, old_col = old_pos
+        new_row, new_col = new_pos
 
+        # Entferne geschlagene Figur falls vorhanden
         if captured is not None:
             self.remove_piece(captured)
-        if (0 <= row < 8 and 0 <= col < 8):
-            self.squares[row, col] = None
-            self.squares[row, col] = piece
-            piece.move_to = new_pos
+
+        # Führe den Zug aus
+        if (0 <= new_row < 8 and 0 <= new_col < 8):
+            # Alte Position leer setzen
+            self.squares[old_row, old_col] = None
+            
+            # Figur auf neue Position setzen
+            self.squares[new_row, new_col] = piece
+            
+            # Position der Figur aktualisieren
+            piece.move_to(new_pos)
 
     def __str__(self):
         display = ""

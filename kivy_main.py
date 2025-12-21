@@ -75,11 +75,19 @@ class ChessSquare(BoxLayout):
                 return True
         return super().on_touch_down(touch)
 
-    def add_highlight_dot(self):
-        """Zeigt einen Punkt auf dem Feld (legal move)."""
+    def add_highlight_dot(self, color='gray'):
+        """Zeigt einen Punkt auf dem Feld (legal move).
+        
+        Args:
+            color: 'gray' für normalen Zug, 'red' für Schlagzug
+        """
         # Draw in canvas.after to be above background but under children widgets
         with self.canvas.after:
-            Color(0.2, 0.2, 0.2, 0.8)  # Dunkelgrau mit 80% Deckkraft
+            if color == 'red':
+                Color(1, 0, 0, 0.7)  # Rot mit 70% Deckkraft
+            else:
+                Color(0.2, 0.2, 0.2, 0.8)  # Dunkelgrau mit 80% Deckkraft
+            
             d = min(self.width, self.height) * 0.25
             self.dot = Ellipse(pos=(self.x + self.width / 2 - d / 2,
                                     self.y + self.height / 2 - d / 2),
@@ -104,6 +112,7 @@ class ChessBoard(GridLayout):
         self.board_array = board_array  # numpy array mit Piece-Objekten
         self.board_obj = None  # Referenz auf Board-Objekt für legal_moves
         self.squares = {}  # Dictionary zur Speicherung der ChessSquare-Widgets
+        self.checkmate_position = None  # (row, col) des Königs in Schachmatt oder None
         
         # Rahmen-Hintergrund (dunkle Metallfarbe)
         with self.canvas.before:
@@ -171,12 +180,18 @@ class ChessBoard(GridLayout):
         self.bg_rect.pos = self.pos
         self.bg_rect.size = self.size
     
-    def update_board(self, board_array):
+    def update_board(self, board_array, checkmate_position: tuple = None):
         """Aktualisiert das Brett mit einem neuen board_array."""
         self.board_array = board_array
         for (row, col), square in self.squares.items():
             piece = board_array[row, col] if board_array is not None else None
             square.set_piece(piece)
+            
+            # Checkmate-Highlighting: Rote transparente Farbe für König in Schachmatt
+            if checkmate_position is not None:
+                with square.canvas.after:
+                    Color(1, 0, 0, 0.4)  # Rot, 40% Transparenz
+                    Rectangle(pos=square.pos, size=square.size)
 
     def set_board(self, board_obj):
         """Setzt Referenz auf das Board-Objekt (für legal_moves)."""
