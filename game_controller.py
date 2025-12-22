@@ -54,6 +54,7 @@ class GameController:
         self.move_history = []
         self.valid_moves = []  # Alle gültigen Züge für aktuellen Spieler
         self.legal_moves = [] # Alle legalen Züge für die ausgewähle Figur 
+        self.pending_promotion_move: Optional[Move] = None  # Move der auf Promotion wartet
         
         # Spieler-Informationen
         self.white_player = None
@@ -186,9 +187,11 @@ class GameController:
     
     def _update_valid_moves(self):
         """Aktualisiert alle gültigen Züge für aktuellen Spieler."""
+
         if not self.chess_logic:
             print('Fehler')
             self.valid_moves = []
+            self.checkmate = None
             return
         
         moves = self.chess_logic.all_legal_moves(self.last_move, self.current_turn)
@@ -202,6 +205,13 @@ class GameController:
             else:
                 raise NotImplementedError('undefined')
         self.valid_moves = moves
+        
+        # Prüfe ob der aktuelle König im Schach steht
+        king = self.board.white_king if self.current_turn == 'white' else self.board.black_king
+        if king and self.chess_logic.is_in_check(king, self.chess_logic.all_moves):
+            self.checkmate = king.position
+        else:
+            self.checkmate = None
     
     def on_square_clicked(self, row, col):
         """
@@ -267,16 +277,20 @@ class GameController:
         # UI aktualisieren: Highlights setzen
         if self.board_widget:
             self.board_widget.clear_highlights()
+            
+            # Markiere das ausgewählte Feld
+            if piece.position in self.board_widget.squares:
+                self.board_widget.squares[piece.position].add_selection_highlight()
+            
+            # Markiere legale Zielfelder
             for move in legal_positions:
-                if move.from_pos in self.board_widget.squares:
+                if move.to_pos in self.board_widget.squares:
                     # Rote Punkte für Schlagzüge, graue für normale Züge
                     if move.captured:
                         self.board_widget.squares[move.to_pos].add_highlight_dot('red')
                     else:
                         self.board_widget.squares[move.to_pos].add_highlight_dot('gray')
         return legal_positions
-        
-
     
     def _deselect_piece(self):
         """Hebt die Auswahl auf und entfernt Highlights."""
@@ -290,10 +304,53 @@ class GameController:
         Führt einen Zug aus und aktualisiert alles.
         
         Args:
-            piece: Figur die bewegt wird
-            target_pos: Zielposition (row, col)
+            move: Move-Objekt mit allen Zug-Informationen
         """
+        # Prüfe ob Promotion nötig ist
+        if move.promotion is not None:
+            # Speichere Move und öffne Popup
+            self.pending_promotion_move = move
+            self._show_promotion_dialog(self.current_turn, self._on_promotion_selected)
+        else:
+            # Kein Promotion -> direkt ausführen
+            self._complete_move(move)
+    
+    def _on_promotion_selected(self, piece_type: str):
+        """
+        Callback wenn Spieler Promotion-Figur gewählt hat.
         
+        Args:
+            piece_type: 'Q', 'R', 'B' oder 'N'
+        """
+        if self.pending_promotion_move:
+            # Setze gewählte Figur
+            self.pending_promotion_move.promotion = piece_type
+            # Führe Move aus
+            self._complete_move(self.pending_promotion_move)
+            # Reset pending move
+            self.pending_promotion_move = None
+    
+    def _show_promotion_dialog(self, color, callback):
+        """
+        Öffnet Promotion-Popup und ruft callback mit gewählter Figur auf.
+        
+        Args:
+            color: 'white' oder 'black'
+            callback: Funktion die mit 'Q', 'R', 'B' oder 'N' aufgerufen wird
+        """
+        if self.game_screen:
+            self.game_screen.show_promotion_popup(color, callback)
+        else:
+            # Fallback: Standardmäßig Dame
+            callback('Q')
+    
+    def _complete_move(self, move: Move):
+        """
+        Führt den Zug komplett aus (nachdem evtl. Promotion gewählt wurde).
+        
+        Args:
+            move: Move-Objekt mit allen Zug-Informationen
+        """
         # Zug im Board ausführen
         self.board.make_move(move)
         
@@ -314,7 +371,7 @@ class GameController:
         
         # UI aktualisieren
         if self.board_widget:
-            self.board_widget.update_board(self.board.squares)
+            self.board_widget.update_board(self.board.squares, self.checkmate)
         
         if self.game_screen:
             self.game_screen.update_turn_info(self.current_turn)
@@ -342,11 +399,25 @@ class GameController:
         Returns:
             String mit Zugnotation
         """
-        to_row, to_col = move.to_pos
-        symbol = move.piece.notation
+        # Rochade
+        if move.castelling:
+            if move.to_pos[1] == 6:  # Kurze Rochade
+                return "O-O"
+            else:  # Lange Rochade
+                return "O-O-O"
         
+        # Normale Züge
+        to_row, to_col = move.to_pos
         to_notation = chr(ord('a') + to_col) + str(8 - to_row)
-        piece_symbol = symbol if symbol != 'P'  else ''
+        
+        symbol = move.piece.notation
+        piece_symbol = '' if symbol == 'P' else symbol
         capture_symbol = 'x' if move.captured else '-'
         
-        return f"{piece_symbol}{capture_symbol}{to_notation}"
+        notation = f"{piece_symbol}{capture_symbol}{to_notation}"
+        
+        # Promotion
+        if move.promotion:
+            notation += '=' + move.promotion.upper()
+        
+        return notation

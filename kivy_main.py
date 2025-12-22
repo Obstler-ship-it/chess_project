@@ -25,6 +25,9 @@ class ChessSquare(BoxLayout):
         self.piece = piece
         self.press_callback = None
         self.dot = None  # Ellipse highlight for legal move
+        self.selection_overlay = None  # Rectangle für ausgewähltes Feld
+        self.check_overlay = None  # Rectangle für König im Schach (separater Layer)
+        self.check_event = None  # Scheduled event zum Entfernen der Check-Markierung
         self.bind(pos=self.update_rect, size=self.update_rect)
 
         with self.canvas.before:
@@ -51,6 +54,12 @@ class ChessSquare(BoxLayout):
             self.dot.pos = (self.x + self.width / 2 - d / 2,
                             self.y + self.height / 2 - d / 2)
             self.dot.size = (d, d)
+        if self.selection_overlay is not None:
+            self.selection_overlay.pos = self.pos
+            self.selection_overlay.size = self.size
+        if self.check_overlay is not None:
+            self.check_overlay.pos = self.pos
+            self.check_overlay.size = self.size
     
     def set_piece(self, piece):
         """Setzt oder aktualisiert die Figur auf diesem Feld."""
@@ -94,11 +103,42 @@ class ChessSquare(BoxLayout):
                                size=(d, d))
 
     def clear_highlight(self):
-        """Entfernt den Punkt vom Feld, falls vorhanden."""
-        if self.dot is not None:
-            # Remove by clearing canvas.after and resetting
-            self.canvas.after.clear()
-            self.dot = None
+        """Entfernt den Punkt und Selection-Overlay vom Feld, falls vorhanden."""
+        # Immer canvas.after löschen, unabhängig ob dot oder selection_overlay existiert
+        self.canvas.after.clear()
+        self.dot = None
+        self.selection_overlay = None
+    
+    def add_selection_highlight(self):
+        """Markiert dieses Feld als ausgewählt (graue Transparenz)."""
+        with self.canvas.after:
+            Color(0.5, 0.5, 0.5, 0.3)  # Grau mit 30% Transparenz
+            self.selection_overlay = Rectangle(pos=self.pos, size=self.size)
+    
+    def add_check_highlight(self):
+        """Markiert König im Schach (rot, verschwindet nach 2 Sekunden)."""
+        from kivy.clock import Clock
+        
+        # Entferne vorherige Check-Markierung falls vorhanden
+        self.remove_check_highlight()
+        
+        # Füge neue Markierung hinzu (in canvas, nicht canvas.after!)
+        with self.canvas:
+            Color(1, 0, 0, 0.4)  # Rot, 40% Transparenz
+            self.check_overlay = Rectangle(pos=self.pos, size=self.size)
+        
+        # Schedule zum Entfernen nach 2 Sekunden
+        self.check_event = Clock.schedule_once(lambda dt: self.remove_check_highlight(), 2.0)
+    
+    def remove_check_highlight(self):
+        """Entfernt Check-Markierung vom König."""
+        if self.check_event:
+            self.check_event.cancel()
+            self.check_event = None
+        
+        if self.check_overlay:
+            self.canvas.remove(self.check_overlay)
+            self.check_overlay = None
 
 
 class ChessBoard(GridLayout):
@@ -187,11 +227,9 @@ class ChessBoard(GridLayout):
             piece = board_array[row, col] if board_array is not None else None
             square.set_piece(piece)
             
-            # Checkmate-Highlighting: Rote transparente Farbe für König in Schachmatt
-            if checkmate_position is not None:
-                with square.canvas.after:
-                    Color(1, 0, 0, 0.4)  # Rot, 40% Transparenz
-                    Rectangle(pos=square.pos, size=square.size)
+            # Check-Highlighting: Rote transparente Farbe für König in Schach (2 Sekunden)
+            if checkmate_position is not None and (row, col) == checkmate_position:
+                square.add_check_highlight()
 
     def set_board(self, board_obj):
         """Setzt Referenz auf das Board-Objekt (für legal_moves)."""
@@ -247,6 +285,86 @@ class ChessBoard(GridLayout):
                     r, c = mv
                     if (r, c) in self.squares:
                         self.squares[(r, c)].add_highlight_dot()
+
+
+class PromotionPopup(Popup):
+    """Popup für Bauern-Promotion (Wahl zwischen Q, R, B, N)."""
+    def __init__(self, color, callback, **kwargs):
+        """
+        Args:
+            color: 'white' oder 'black' - Farbe der Figur
+            callback: Funktion die aufgerufen wird mit gewählter Figur ('Q', 'R', 'B', 'N')
+        """
+        super().__init__(**kwargs)
+        self.callback = callback
+        self.color = color
+        
+        self.title = 'Bauer befördern zu...'
+        self.size_hint = (0.6, 0.5)
+        self.auto_dismiss = False  # Spieler muss wählen
+        
+        # Layout
+        layout = BoxLayout(orientation='vertical', spacing=20, padding=20)
+        
+        # Info-Text
+        info_label = Label(
+            text=f'Wähle eine Figur für die Beförderung:',
+            size_hint=(1, 0.2),
+            font_size='20sp'
+        )
+        layout.add_widget(info_label)
+        
+        # Button-Container (2x2 Grid)
+        button_grid = GridLayout(cols=2, spacing=15, size_hint=(1, 0.8))
+        
+        # Queen Button
+        queen_btn = Button(
+            text='Dame (Q)',
+            font_size='22sp',
+            background_color=(0.9, 0.7, 0.2, 1),
+            bold=True
+        )
+        queen_btn.bind(on_press=lambda x: self.select_piece('Q'))
+        button_grid.add_widget(queen_btn)
+        
+        # Rook Button
+        rook_btn = Button(
+            text='Turm (R)',
+            font_size='22sp',
+            background_color=(0.3, 0.6, 0.8, 1),
+            bold=True
+        )
+        rook_btn.bind(on_press=lambda x: self.select_piece('R'))
+        button_grid.add_widget(rook_btn)
+        
+        # Bishop Button
+        bishop_btn = Button(
+            text='Läufer (B)',
+            font_size='22sp',
+            background_color=(0.6, 0.4, 0.7, 1),
+            bold=True
+        )
+        bishop_btn.bind(on_press=lambda x: self.select_piece('B'))
+        button_grid.add_widget(bishop_btn)
+        
+        # Knight Button
+        knight_btn = Button(
+            text='Springer (N)',
+            font_size='22sp',
+            background_color=(0.4, 0.7, 0.4, 1),
+            bold=True
+        )
+        knight_btn.bind(on_press=lambda x: self.select_piece('N'))
+        button_grid.add_widget(knight_btn)
+        
+        layout.add_widget(button_grid)
+        self.content = layout
+    
+    def select_piece(self, piece_type):
+        """Wird aufgerufen wenn Spieler eine Figur wählt."""
+        if self.callback:
+            self.callback(piece_type)
+        self.dismiss()
 
 
 class StartMenuScreen(Screen):
@@ -892,6 +1010,17 @@ class GameScreen(Screen):
             self.controller.go_to_pause_menu()
         else:
             self.manager.current = 'pause'
+    
+    def show_promotion_popup(self, color, callback):
+        """
+        Zeigt das Promotion-Popup und ruft callback mit gewählter Figur auf.
+        
+        Args:
+            color: 'white' oder 'black'
+            callback: Funktion die mit Figuren-Typ ('Q', 'R', 'B', 'N') aufgerufen wird
+        """
+        popup = PromotionPopup(color, callback)
+        popup.open()
 
 
 class StatsMenuScreen(Screen):

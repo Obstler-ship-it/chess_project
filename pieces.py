@@ -290,7 +290,10 @@ class BlackPawn(Piece):
 
         if row + 1 < 8:
             if board.squares[row + 1, col] is None: # Ziehen möglich
-                legal_moves.append(Move(self.position, (row + 1, col), self, None))
+                if (row + 1) == 7:
+                    legal_moves.append(Move(self.position, (row + 1, col), self, None, promotion='Q'))  # Promotion möglich
+                else:
+                    legal_moves.append(Move(self.position, (row + 1, col), self, None))  # Ziehen möglich
 
         if 0 <= col -1 and col + 1 < 8:  # En-passant
             for (x, y) in [(row, col + 1), (row, col - 1)]:
@@ -306,7 +309,10 @@ class BlackPawn(Piece):
             if (0 <= x < 8 and 0 <= y < 8):
                 target = board.squares[x, y]
                 if target is not None and target.color != self.color:
-                    legal_moves.append(Move(self.position, (x, y), self, target))  # Schlagen möglich
+                    if (x == 7):
+                        legal_moves.append(Move(self.position, (x, y), self, target, promotion='Q'))  # Promotion möglich
+                    else:
+                        legal_moves.append(Move(self.position, (x, y), self, target))  # Schlagen möglich
 
         return legal_moves
 
@@ -334,7 +340,10 @@ class WhitePawn(Piece):
 
         if 0 <= row - 1:
             if board.squares[row - 1, col] is None:
-                    legal_moves.append(Move(self.position, (row - 1, col), self, None))  # Ziehen möglich
+                    if (row - 1) == 0:
+                        legal_moves.append(Move(self.position, (row - 1, col), self, None, promotion='Q'))  # Promotion möglich
+                    else:
+                        legal_moves.append(Move(self.position, (row - 1, col), self, None))  # Ziehen möglich
 
         if 0 <= col -1 and col + 1 < 8:  # En-passant
             for (x, y) in [(row, col + 1), (row, col - 1)]:
@@ -350,7 +359,10 @@ class WhitePawn(Piece):
             if (0 <= x < 8 and 0 <= y < 8):
                 target = board.squares[x, y]
                 if target is not None and target.color != self.color:
-                    legal_moves.append(Move(self.position, (x, y), self, target))  # Schlagen möglich
+                    if (x == 0):
+                        legal_moves.append(Move(self.position, (x, y), self, target, promotion='Q'))  # Promotion möglich
+                    else:
+                        legal_moves.append(Move(self.position, (x, y), self, target))  # Schlagen möglich
 
         return legal_moves
 

@@ -131,6 +131,14 @@ class Board:
         new_row, new_col = new_pos
 
         if last_move.promotion:
+            # Entferne alten Bauern aus den Listen
+            if piece.color == 'white':
+                if piece in self.white_pieces:
+                    self.white_pieces.remove(piece)
+            else:
+                if piece in self.black_pieces:
+                    self.black_pieces.remove(piece)
+            
             # Erstelle neue Figur basierend auf der Promotion
             if piece.color == 'white':
                 if last_move.promotion == 'Q':
@@ -141,6 +149,8 @@ class Board:
                     piece = Bishop('white', new_pos)
                 elif last_move.promotion == 'N':
                     piece = Knight('white', new_pos)
+                # Füge neue Figur zu Listen hinzu
+                self.white_pieces.append(piece)
             else:
                 if last_move.promotion == 'Q':
                     piece = Queen('black', new_pos)
@@ -150,6 +160,8 @@ class Board:
                     piece = Bishop('black', new_pos)
                 elif last_move.promotion == 'N':
                     piece = Knight('black', new_pos)
+                # Füge neue Figur zu Listen hinzu
+                self.black_pieces.append(piece)
 
         # Führe den Zug aus
         if (0 <= new_row < 8 and 0 <= new_col < 8):
@@ -173,8 +185,21 @@ class Board:
             # Setze moved-Flag für Türme, Könige und Bauern
             if hasattr(piece, 'moved'):
                 piece.moved = True
-            
 
+        # Rochade: Turm bewegen
+        if last_move.castelling is not None:
+            rook = last_move.castelling
+            
+            # Bestimme neue Turm-Position basierend auf König-Zielposition
+            if new_col == 6:  # Kurze Rochade (König nach g)
+                rook_new_pos = (new_row, 5)  # Turm nach f
+            else:  # Lange Rochade (König nach c)
+                rook_new_pos = (new_row, 3)  # Turm nach d
+            
+            # Erstelle Move für Turm und führe ihn aus
+            rook_move = Move(rook.position, rook_new_pos, rook)
+            self.make_move(rook_move)
+            
     def __str__(self):
         display = ""
         for row in self.squares:
