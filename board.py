@@ -149,7 +149,6 @@ class Board:
             return True
         
         return False
-                piece.moved = True
 
     def __str__(self):
         display = ""

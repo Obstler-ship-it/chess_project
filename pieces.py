@@ -189,7 +189,7 @@ class Bishop(Piece):
         """
         legal_moves = []
 
-        directions = [(1, 1), (-1, 1), (-1, 1), (1, -1)]
+        directions = [(1, 1), (-1, 1), (-1, -1), (1, -1)]
 
         for dx, dy in directions:
 

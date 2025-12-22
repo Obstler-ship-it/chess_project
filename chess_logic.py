@@ -1,6 +1,7 @@
 from board import Board
 from move import Move
 from pieces import Piece
+from typing import Optional
 
 class chess_logik:
     """ Überprüft auf höchster Ebene die Zulässigkeit von Zügen"""
@@ -38,9 +39,7 @@ class chess_logik:
         """ Speichert die letzt bewegte Figur ab """
 
         if last_move:
-            if self.last_moved_piece.is_pawn:
-                if abs(last_move.from_pos[0] - last_move.to_pos[0]) == 2:
-                    self.en_passant_posible = True
+           pass
             
         else:
             raise ValueError('last_move is None or False')
