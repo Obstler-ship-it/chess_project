@@ -15,7 +15,7 @@ Trennung der Verantwortlichkeiten:
 from typing import Optional
 from board import Board
 from pieces import Piece
-from chess_logic import chess_logic
+from chess_logic import ChessLogic
 from move import Move
 
 
@@ -50,7 +50,7 @@ class GameController:
         self.current_turn = None
         self.selected_piece = None
         self.last_move: Optional[Move] = None
-        self.checkmate: tuple = None
+        self.checkmate: Optional[tuple] = None
         self.move_history = []
         self.valid_moves = []  # Alle gültigen Züge für aktuellen Spieler
         self.legal_moves = [] # Alle legalen Züge für die ausgewähle Figur 
@@ -133,7 +133,7 @@ class GameController:
         # Backend initialisieren
         self.board = Board()
         self.board.setup_startpos()  # Explizit aufrufen für neues Spiel
-        self.chess_logic = chess_logic(self.board)
+        self.chess_logic = ChessLogic(self.board)
         
         # Spielzustand zurücksetzen
         self.current_turn = 'white'
@@ -249,18 +249,19 @@ class GameController:
                 self._deselect_piece()
                 self.legal_moves = self._select_piece(piece)
             
+            # Klick auf ein anderes Feld -> prüfe ob legaler Zug
             else:
+                move_executed = False
                 for move in self.legal_moves:
                     if (row, col) == move.to_pos:
                         # Klick auf legalen Zug -> Zug ausführen
                         self._execute_move(move)
-                    else:
-                        # Klick auf illegales Feld -> Auswahl aufheben
-                        self._deselect_piece()
-        
-            ## Debug TODO
-            for move in self.legal_moves:
-                print(move)
+                        move_executed = True
+                        break
+                
+                # Wenn kein legaler Zug -> Auswahl aufheben
+                if not move_executed:
+                    self._deselect_piece()
     
     def _select_piece(self, piece) -> list[Move]:
         """
@@ -395,13 +396,11 @@ class GameController:
     
     # ==================== Hilfsmethoden ====================
     
-    def undo_last_move(self):
-        """Macht den letzten Zug rückgängig (optional)."""
-        if not self.move_history:
-            return False
-        
-        # TODO: Implementiere Undo-Funktion
-        return False
+    # Unicode-Schachsymbole
+    PIECE_SYMBOLS = {
+        'white': {'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘', 'P': '♙'},
+        'black': {'K': '♚', 'Q': '♛', 'R': '♜', 'B': '♝', 'N': '♞', 'P': '♟'}
+    }
     
     def get_move_notation(self, move: Move) -> str:
         """
@@ -435,3 +434,56 @@ class GameController:
             notation += '=' + move.promotion.upper()
         
         return notation
+    
+    def get_formatted_move_notation(self, move: Move) -> str:
+        """
+        Konvertiert einen Move in formatierte Schachnotation mit Unicode-Symbolen und Farben.
+        
+        Args:
+            move: Move-Objekt
+        
+        Returns:
+            String mit formatierter Zugnotation (mit Kivy markup)
+        """
+        color = move.piece.color
+        # Farben: Weiß = heller, Schwarz = dunkler
+        text_color = 'E8E8FF' if color == 'white' else 'C0C0D0'
+        
+        # Rochade
+        if move.castelling:
+            if move.to_pos[1] == 6:  # Kurze Rochade
+                notation = "O-O"
+            else:  # Lange Rochade
+                notation = "O-O-O"
+            return f"[color={text_color}]{notation}[/color]"
+        
+        # Unicode-Symbol für Figur
+        symbol = move.piece.notation
+        if symbol in self.PIECE_SYMBOLS[color]:
+            piece_symbol = self.PIECE_SYMBOLS[color][symbol]
+        else:
+            piece_symbol = ''
+        
+        # Zielfeld
+        to_row, to_col = move.to_pos
+        to_notation = chr(ord('a') + to_col) + str(8 - to_row)
+        
+        # Schlagzug-Symbol
+        if move.captured:
+            capture_symbol = '×'  # Schönes Unicode-Kreuz
+        else:
+            capture_symbol = ''
+        
+        # Zusammensetzen
+        notation = f"{piece_symbol}{capture_symbol}{to_notation}"
+        
+        # Promotion
+        if move.promotion:
+            promo_piece = move.promotion.upper()
+            if promo_piece in self.PIECE_SYMBOLS[color]:
+                promo_symbol = self.PIECE_SYMBOLS[color][promo_piece]
+                notation += f"={promo_symbol}"
+            else:
+                notation += f"={promo_piece}"
+        
+        return f"[color={text_color}]{notation}[/color]"

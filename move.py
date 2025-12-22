@@ -17,6 +17,8 @@ class Move:
         piece: Das Piece-Objekt das bewegt wird
         captured: Geschlagene Figur (False wenn keine)
         promotion: Promotionstyp ('queen', 'rook', 'bishop', 'knight' oder None)
+        castelling: Das Turm-Objekt bei Rochade (oder None)
+        en_passant: True wenn Zug en-passant ist
     """
     from_pos: tuple
     to_pos: tuple

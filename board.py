@@ -1,8 +1,10 @@
 """ Diese Klasse stellt das Schachbrett mit allen Figuren als numpy 8x8 Array dar"""
 
 import numpy as np
+import numpy.typing as npt
 import copy
-from pieces import Piece, BlackPawn, WhitePawn, Rook, Knight, Queen, King, Bishop
+from typing import Optional
+from pieces import Piece, Pawn, Rook, Knight, Queen, King, Bishop
 from move import Move
 
 
@@ -14,7 +16,7 @@ class Board:
 
     def __init__(self):
         """ Konstruktor """
-        self.squares = np.full((8, 8), None, dtype=object)
+        self.squares: npt.NDArray[Optional[Piece]] = np.full((8, 8), None, dtype=object)
         
         # Figuren-Listen
         self.white_pieces = []
@@ -32,8 +34,8 @@ class Board:
         
         # Pawns
         for col in range(8):
-            bp = BlackPawn('black', (1, col))
-            wp = WhitePawn('white', (6, col))
+            bp = Pawn('black', (1, col))
+            wp = Pawn('white', (6, col))
             self.squares[1, col] = bp
             self.squares[6, col] = wp
             self.black_pieces.append(bp)
@@ -139,28 +141,22 @@ class Board:
                 if piece in self.black_pieces:
                     self.black_pieces.remove(piece)
             
+            # Mapping von Promotion-Typ zu Piece-Klasse
+            promotion_map = {
+                'Q': Queen,
+                'R': Rook,
+                'B': Bishop,
+                'N': Knight
+            }
+            
             # Erstelle neue Figur basierend auf der Promotion
+            piece_class = promotion_map.get(last_move.promotion, Queen)
+            piece = piece_class(piece.color, new_pos)
+            
+            # Füge neue Figur zu Listen hinzu
             if piece.color == 'white':
-                if last_move.promotion == 'Q':
-                    piece = Queen('white', new_pos)
-                elif last_move.promotion == 'R':
-                    piece = Rook('white', new_pos)
-                elif last_move.promotion == 'B':
-                    piece = Bishop('white', new_pos)
-                elif last_move.promotion == 'N':
-                    piece = Knight('white', new_pos)
-                # Füge neue Figur zu Listen hinzu
                 self.white_pieces.append(piece)
             else:
-                if last_move.promotion == 'Q':
-                    piece = Queen('black', new_pos)
-                elif last_move.promotion == 'R':
-                    piece = Rook('black', new_pos)
-                elif last_move.promotion == 'B':
-                    piece = Bishop('black', new_pos)
-                elif last_move.promotion == 'N':
-                    piece = Knight('black', new_pos)
-                # Füge neue Figur zu Listen hinzu
                 self.black_pieces.append(piece)
 
         # Führe den Zug aus

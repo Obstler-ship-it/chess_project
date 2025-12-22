@@ -37,11 +37,19 @@ class Piece:
     def position(self, value: tuple):
         """ Setter für die Position der Figur """
         self._position = value
-    
-    def __del__(self):
-        """ War nur für Debug """
-        # Destruktor: Wird aufgerufen, wenn Figur gelöscht wird
-        #print(f"{self.notation} - {self.color} piece destroyed")
+
+    @staticmethod
+    def _is_valid_square(row: int, col: int) -> bool:
+        """Prüft ob eine Position auf dem Brett liegt.
+        
+        Args:
+            row: Zeile (0-7)
+            col: Spalte (0-7)
+            
+        Returns:
+            True wenn Position gültig ist
+        """
+        return 0 <= row < 8 and 0 <= col < 8
 
 
 class King(Piece):
@@ -118,7 +126,7 @@ class Queen(Piece):
                 row += dx
                 col += dy
 
-                if not (0 <= row < 8 and 0 <= col < 8):
+                if not self._is_valid_square(row, col):
                     break  # außerhalb des Brettes
 
                 target = board.squares[row, col]
@@ -206,11 +214,10 @@ class Bishop(Piece):
             row, col = self.position
 
             while True:
-
                 row += dx
                 col += dy
 
-                if not (0 <= row < 8 and 0 <= col < 8):
+                if not self._is_valid_square(row, col):
                     break
 
                 target = board.squares[row, col]
@@ -229,7 +236,7 @@ class Bishop(Piece):
 
     def __str__(self):
         return "♝" if self.color == "black" else "♗"
-
+    
 
 class Knight(Piece):
     """ Springer """
@@ -250,12 +257,10 @@ class Knight(Piece):
         self_row, self_col = self.position
 
         for dx, dy in directions:
-
             row = self_row + dx
             col = self_col + dy
 
-            if (0 <= row < 8 and 0 <= col < 8):
-
+            if self._is_valid_square(row, col):
                 target = board.squares[row, col]
 
                 if target is None:  # Leeres Feld
@@ -270,8 +275,8 @@ class Knight(Piece):
         return "♞" if self.color == "black" else "♘"
 
 
-class BlackPawn(Piece):
-    """ Schwarzer Bauer """
+class Pawn(Piece):
+    """Bauer-Klasse für beide Farben."""
 
     def __init__(self, color: str, position: tuple):
         super().__init__(color, position, notation='P', is_pawn=True)
@@ -279,93 +284,69 @@ class BlackPawn(Piece):
         self.moved_2_once = False
 
     def get_legal_moves(self, board: 'bd.Board') -> list[Move]:
+        """Gibt alle legalen Züge des Bauers zurück.
+        
+        Args:
+            board: Board-Objekt mit board.squares als np.array
+            
+        Returns:
+            Liste von Move-Objekten
         """
-        Gibt alle legalen Züge des Bauers zurück.
-        :param board: 2D np.array mit Figurenobjekten oder None
-        :return: Liste von Move-Objekten
-        """
+        # Richtung und Promotion-Reihe basierend auf Farbe
+        direction = 1 if self.color == 'black' else -1
+        promotion_row = 7 if self.color == 'black' else 0
+        
         legal_moves = []
-
         row, col = self.position
+        next_row = row + direction
 
-        if row + 1 < 8:
-            if board.squares[row + 1, col] is None: # Ziehen möglich
-                if (row + 1) == 7:
-                    legal_moves.append(Move(self.position, (row + 1, col), self, None, promotion='Q'))  # Promotion möglich
-                else:
-                    legal_moves.append(Move(self.position, (row + 1, col), self, None))  # Ziehen möglich
+        # Normaler Zug vorwärts
+        if self._is_valid_square(next_row, col):
+            if board.squares[next_row, col] is None:
+                promotion = 'Q' if next_row == promotion_row else None
+                legal_moves.append(
+                    Move(self.position, (next_row, col), self, None,
+                         promotion=promotion)
+                )
 
-        if 0 <= col -1 and col + 1 < 8:  # En-passant
-            for (x, y) in [(row, col + 1), (row, col - 1)]:
-                target = board.squares[x, y]
-                square = board.squares[row + 1 , col]
-                if target is not None and target.is_pawn and target.color != self.color and square is None:
-                    legal_moves.append(Move(self.position, (x + 1, y), self, target, en_passant=True))
+        # En-passant
+        if 0 <= col - 1 and col + 1 < 8:
+            for y in [col + 1, col - 1]:
+                target = board.squares[row, y]
+                square_ahead = board.squares[next_row, col]
+                if (target is not None and target.is_pawn and
+                    target.color != self.color and square_ahead is None):
+                    legal_moves.append(
+                        Move(self.position, (next_row, y), self, target,
+                             en_passant=True)
+                    )
 
-        if (self.moved is False) and (board.squares[row + 2, col] is None) and (board.squares[row + 1, col] is None):
-            legal_moves.append(Move(self.position, (row + 2, col), self, None))  # Zwei Felder ziehen möglich
+        # Zwei Felder vorwärts (erster Zug)
+        double_row = row + 2 * direction
+        if (not self.moved and self._is_valid_square(double_row, col) and
+            board.squares[double_row, col] is None and
+            board.squares[next_row, col] is None):
+            legal_moves.append(
+                Move(self.position, (double_row, col), self, None)
+            )
 
-        for (x, y) in [(row + 1, col +1), (row + 1, col - 1)]:
-            if (0 <= x < 8 and 0 <= y < 8):
-                target = board.squares[x, y]
+        # Schlagen diagonal
+        for dy in [1, -1]:
+            target_row, target_col = next_row, col + dy
+            if self._is_valid_square(target_row, target_col):
+                target = board.squares[target_row, target_col]
                 if target is not None and target.color != self.color:
-                    if (x == 7):
-                        legal_moves.append(Move(self.position, (x, y), self, target, promotion='Q'))  # Promotion möglich
-                    else:
-                        legal_moves.append(Move(self.position, (x, y), self, target))  # Schlagen möglich
+                    promotion = 'Q' if target_row == promotion_row else None
+                    legal_moves.append(
+                        Move(self.position, (target_row, target_col),
+                             self, target, promotion=promotion)
+                    )
 
         return legal_moves
-
+    
     def __str__(self):
-        return "♙"
+        return "♙" if self.color == "black" else "♟"
 
 
-class WhitePawn(Piece):
-    """ Weißer Bauer """
 
-    def __init__(self, color: str, position: tuple):
-        super().__init__(color, position, notation='P', is_pawn=True)
-        self.moved = False
-        self.moved_2_once = False
-
-    def get_legal_moves(self, board: 'bd.Board') -> list[Move]:
-        """
-        Gibt alle legalen Züge des Bauers zurück.
-        :param board: 2D np.array mit Figurenobjekten oder None
-        :return: Liste von Move-Objekten
-        """
-        legal_moves = []
-
-        row, col = self.position
-
-        if 0 <= row - 1:
-            if board.squares[row - 1, col] is None:
-                    if (row - 1) == 0:
-                        legal_moves.append(Move(self.position, (row - 1, col), self, None, promotion='Q'))  # Promotion möglich
-                    else:
-                        legal_moves.append(Move(self.position, (row - 1, col), self, None))  # Ziehen möglich
-
-        if 0 <= col -1 and col + 1 < 8:  # En-passant
-            for (x, y) in [(row, col + 1), (row, col - 1)]:
-                target = board.squares[x, y]
-                square = board.squares[row - 1 , col]
-                if target is not None and target.is_pawn and target.color != self.color and square is None:
-                    legal_moves.append(Move(self.position, (x - 1, y), self, target, en_passant=True))
-
-        if (self.moved is False) and (board.squares[row - 2, col] is None) and (board.squares[row - 1, col] is None):
-            legal_moves.append(Move(self.position, (row - 2, col), self, None))  # Zwei Felder ziehen möglich
-
-        for (x, y) in [(row - 1, col + 1), (row - 1, col - 1)]:
-            if (0 <= x < 8 and 0 <= y < 8):
-                target = board.squares[x, y]
-                if target is not None and target.color != self.color:
-                    if (x == 0):
-                        legal_moves.append(Move(self.position, (x, y), self, target, promotion='Q'))  # Promotion möglich
-                    else:
-                        legal_moves.append(Move(self.position, (x, y), self, target))  # Schlagen möglich
-
-        return legal_moves
-
-    def __str__(self):
-        return "♟"
 

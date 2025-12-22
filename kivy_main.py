@@ -116,7 +116,7 @@ class ChessSquare(BoxLayout):
             self.selection_overlay = Rectangle(pos=self.pos, size=self.size)
     
     def add_check_highlight(self):
-        """Markiert König im Schach (rot, verschwindet nach 2 Sekunden)."""
+        """Markiert König im Schach (rot, verschwindet nach 0.8 Sekunden)."""
         from kivy.clock import Clock
         
         # Entferne vorherige Check-Markierung falls vorhanden
@@ -127,8 +127,8 @@ class ChessSquare(BoxLayout):
             Color(1, 0, 0, 0.4)  # Rot, 40% Transparenz
             self.check_overlay = Rectangle(pos=self.pos, size=self.size)
         
-        # Schedule zum Entfernen nach 2 Sekunden
-        self.check_event = Clock.schedule_once(lambda dt: self.remove_check_highlight(), 2.0)
+        # Schedule zum Entfernen nach 0.8 Sekunden
+        self.check_event = Clock.schedule_once(lambda dt: self.remove_check_highlight(), 0.8)
     
     def remove_check_highlight(self):
         """Entfernt Check-Markierung vom König."""
@@ -476,13 +476,15 @@ class StartMenuScreen(Screen):
     def __init__(self, controller=None, **kwargs):
         super().__init__(**kwargs)
         self.controller = controller
-        # Semi-transparent dark background (like Pause menu)
+        
+        # Einfacher dunkler Hintergrund ohne Muster
         with self.canvas.before:
-            Color(0, 0, 0, 0.85)
+            Color(0.1, 0.12, 0.18, 1)
             self.bg_rect = Rectangle(pos=self.pos, size=self.size)
+        
         self.bind(pos=self.update_bg, size=self.update_bg)
 
-        # Main layout with padding and spacing (same proportions)
+        # Main layout
         main_layout = BoxLayout(orientation='vertical', padding=[150, 100, 150, 100], spacing=30)
 
         # Centered panel
@@ -490,22 +492,25 @@ class StartMenuScreen(Screen):
 
         # Panel background
         with panel.canvas.before:
-            Color(0.15, 0.15, 0.2, 0.95)
+            Color(0.15, 0.17, 0.22, 0.95)
             self.panel_rect = Rectangle()
+        
         panel.bind(pos=self._update_panel, size=self._update_panel)
 
-        # Title box
+        # Title Section
         title_box = BoxLayout(orientation='vertical', size_hint=(1, 0.2), padding=[0, 20, 0, 10])
+        
         title = Label(
             text='SCHACH',
             font_size='48sp',
             size_hint=(1, 1),
             bold=True,
-            color=(0.9, 0.9, 1, 1)
+            color=(0.95, 0.95, 1, 1)
         )
         title_box.add_widget(title)
         panel.add_widget(title_box)
 
+        # Separator line
         # Separator line
         separator = Widget(size_hint=(1, 0.02))
         with separator.canvas:
@@ -514,7 +519,7 @@ class StartMenuScreen(Screen):
         separator.bind(pos=self._update_separator, size=self._update_separator)
         panel.add_widget(separator)
 
-        # Button container (three options)
+        # Button container
         button_container = BoxLayout(
             orientation='vertical',
             spacing=20,
@@ -522,7 +527,7 @@ class StartMenuScreen(Screen):
             padding=[80, 20, 80, 20]
         )
 
-        # New Game Button - Green
+        # New Game Button - Grün
         new_game_btn = Button(
             text='Neues Spiel',
             font_size='26sp',
@@ -533,9 +538,9 @@ class StartMenuScreen(Screen):
         new_game_btn.bind(on_press=self.start_game)
         button_container.add_widget(new_game_btn)
 
-        # Stats Button - Blue
+        # Stats Button - Blau
         stats_btn = Button(
-            text='Statistiken & Historie',
+            text='Statistiken',
             font_size='26sp',
             size_hint=(1, 0.33),
             background_color=(0.3, 0.4, 0.7, 1),
@@ -544,7 +549,7 @@ class StartMenuScreen(Screen):
         stats_btn.bind(on_press=self.open_stats)
         button_container.add_widget(stats_btn)
 
-        # Quit Button - Red
+        # Quit Button - Rot
         quit_btn = Button(
             text='Beenden',
             font_size='26sp',
@@ -578,11 +583,20 @@ class StartMenuScreen(Screen):
             App.get_running_app().stop()
 
     def _update_panel(self, instance, value):
+        """Update panel rectangle."""
         self.panel_rect.pos = instance.pos
         self.panel_rect.size = instance.size
     
     def _update_separator(self, instance, value):
-        """Aktualisiert Separator Position und Größe."""
+        """Aktualisiert Separator Position und Größe - zentriert."""
+        margin = instance.width * 0.2
+        self.sep_rect.pos = (instance.x + margin, instance.y + instance.height / 2 - 1)
+        self.sep_rect.size = (instance.width - 2 * margin, 2)
+
+    def update_bg(self, *args):
+        """Update background rectangle."""
+        self.bg_rect.pos = self.pos
+        self.bg_rect.size = self.size
         self.sep_rect.pos = (instance.x + instance.width * 0.2, instance.y)
         self.sep_rect.size = (instance.width * 0.6, 2)
 
@@ -598,38 +612,38 @@ class PlayerSelectionScreen(Screen):
         self.controller = controller
         self.db = DatabaseManager()
 
-        # Dunkler, halbtransparenter Hintergrund wie im Pause-Menü
+        # Dunkler Hintergrund wie im Hauptmenü
         with self.canvas.before:
-            Color(0, 0, 0, 0.85)
+            Color(0.1, 0.12, 0.18, 1)
             self.bg_rect = Rectangle(pos=self.pos, size=self.size)
         self.bind(pos=self.update_bg, size=self.update_bg)
 
-        # Hauptlayout mit großzügigem Padding
-        main_layout = BoxLayout(orientation='vertical', padding=[150, 100, 150, 100], spacing=30)
+        # Hauptlayout mit kompakterem Padding
+        main_layout = BoxLayout(orientation='vertical', padding=[120, 60, 120, 60], spacing=20)
 
         # Panel in der Mitte
         panel = BoxLayout(orientation='vertical', spacing=20)
         with panel.canvas.before:
-            Color(0.15, 0.15, 0.2, 0.95)
+            Color(0.15, 0.17, 0.22, 0.95)
             self.panel_rect = Rectangle()
         panel.bind(pos=self._update_panel, size=self._update_panel)
 
         # Titelbereich
-        title_box = BoxLayout(orientation='vertical', size_hint=(1, 0.18), padding=[0, 20, 0, 10])
+        title_box = BoxLayout(orientation='vertical', size_hint=(1, 0.15), padding=[0, 15, 0, 5])
         title = Label(
             text='SPIELER-ANMELDUNG',
-            font_size='42sp',
-            size_hint=(1, 1),
+            font_size='38sp',
+            size_hint=(1, 0.6),
             bold=True,
-            color=(0.9, 0.9, 1, 1)
+            color=(0.95, 0.95, 1, 1)
         )
         title_box.add_widget(title)
 
         info_label = Label(
-            text='Benutzername eingeben (wird automatisch registriert, falls neu)',
-            font_size='15sp',
-            size_hint=(1, 1),
-            color=(0.6, 0.6, 0.7, 1)
+            text='Benutzernamen eingeben oder neuen Account erstellen',
+            font_size='14sp',
+            size_hint=(1, 0.4),
+            color=(0.7, 0.75, 0.85, 1)
         )
         title_box.add_widget(info_label)
         panel.add_widget(title_box)
@@ -639,110 +653,139 @@ class PlayerSelectionScreen(Screen):
         with separator.canvas:
             Color(0.4, 0.4, 0.5, 1)
             self.sep_rect = Rectangle()
-        separator.bind(pos=lambda i, v: setattr(self.sep_rect, 'pos', (i.x + i.width * 0.2, i.y)),
-                       size=lambda i, v: setattr(self.sep_rect, 'size', (i.width * 0.6, 2)))
+        separator.bind(pos=self._update_separator, size=self._update_separator)
         panel.add_widget(separator)
 
         # Spieler-Container
         players_container = BoxLayout(
             orientation='horizontal',
-            spacing=30,
-            size_hint=(1, 0.45),
-            padding=[60, 15, 60, 15]
+            spacing=25,
+            size_hint=(1, 0.38),
+            padding=[50, 20, 50, 20]
         )
 
         # Weißer Spieler
-        white_box = BoxLayout(orientation='vertical', spacing=10)
+        white_box = BoxLayout(orientation='vertical', spacing=15)
         white_label = Label(
-            text='Weißer Spieler',
-            font_size='24sp',
-            size_hint=(1, 0.25),
+            text='WEISS',
+            font_size='22sp',
+            size_hint=(1, None),
+            height=35,
             bold=True,
-            color=(0.9, 0.9, 1, 1)
+            color=(1, 1, 1, 1)
         )
         white_box.add_widget(white_label)
 
         self.white_input = TextInput(
             hint_text='Benutzername',
             multiline=False,
-            size_hint=(1, 0.4),
+            size_hint=(1, None),
+            height=50,
             font_size='20sp',
             write_tab=False,
             text_validate_unfocus=False,
-            background_color=(0.2, 0.2, 0.25, 1),
-            foreground_color=(1, 1, 1, 1)
+            background_color=(0.22, 0.24, 0.28, 1),
+            foreground_color=(1, 1, 1, 1),
+            padding=[15, 12]
         )
         self.white_input.bind(text=lambda instance, value: self.limit_name_length(instance, value, 20))  # type: ignore
         white_box.add_widget(self.white_input)
-        white_box.add_widget(Widget(size_hint=(1, 0.35)))
+        white_box.add_widget(Widget(size_hint=(1, 1)))
         players_container.add_widget(white_box)
 
         # Vertikale Trennlinie
-        vsep = Widget(size_hint=(0.02, 1))
+        vsep = Widget(size_hint=(None, 1), width=1)
         with vsep.canvas:
-            Color(0.4, 0.4, 0.5, 1)
+            Color(0.35, 0.37, 0.42, 1)
             self.vsep_rect = Rectangle()
-        vsep.bind(pos=lambda i, v: setattr(self.vsep_rect, 'pos', (i.x, i.y + i.height * 0.1)),
-                  size=lambda i, v: setattr(self.vsep_rect, 'size', (2, i.height * 0.8)))
+        vsep.bind(pos=self._update_vsep, size=self._update_vsep)
         players_container.add_widget(vsep)
 
         # Schwarzer Spieler
-        black_box = BoxLayout(orientation='vertical', spacing=10)
+        black_box = BoxLayout(orientation='vertical', spacing=15)
         black_label = Label(
-            text='Schwarzer Spieler',
-            font_size='24sp',
-            size_hint=(1, 0.25),
+            text='SCHWARZ',
+            font_size='22sp',
+            size_hint=(1, None),
+            height=35,
             bold=True,
-            color=(0.9, 0.9, 1, 1)
+            color=(0.85, 0.85, 0.85, 1)
         )
         black_box.add_widget(black_label)
 
         self.black_input = TextInput(
             hint_text='Benutzername',
             multiline=False,
-            size_hint=(1, 0.4),
+            size_hint=(1, None),
+            height=50,
             font_size='20sp',
             write_tab=False,
             text_validate_unfocus=False,
-            background_color=(0.2, 0.2, 0.25, 1),
-            foreground_color=(1, 1, 1, 1)
+            background_color=(0.22, 0.24, 0.28, 1),
+            foreground_color=(1, 1, 1, 1),
+            padding=[15, 12]
         )
         self.black_input.bind(text=lambda instance, value: self.limit_name_length(instance, value, 20))  # type: ignore
         black_box.add_widget(self.black_input)
-        black_box.add_widget(Widget(size_hint=(1, 0.35)))
+        black_box.add_widget(Widget(size_hint=(1, 1)))
         players_container.add_widget(black_box)
 
         panel.add_widget(players_container)
 
+        # Horizontale Trennlinie vor Timer
+        timer_sep = Widget(size_hint=(1, None), height=1)
+        with timer_sep.canvas:
+            Color(0.3, 0.32, 0.37, 1)
+            self.timer_sep_rect = Rectangle()
+        timer_sep.bind(pos=self._update_timer_sep, size=self._update_timer_sep)
+        panel.add_widget(timer_sep)
+
         # Timer-Einstellungen
-        timer_box = BoxLayout(orientation='vertical', spacing=8, size_hint=(1, 0.18), padding=[70, 5, 70, 5])
-        timer_container = BoxLayout(orientation='horizontal', spacing=15, size_hint=(1, None), height=40)
+        timer_box = BoxLayout(orientation='vertical', spacing=0, size_hint=(1, 0.22), padding=[50, 15, 50, 10])
+        
+        timer_title = Label(
+            text='TIMER-EINSTELLUNGEN',
+            font_size='16sp',
+            size_hint=(1, None),
+            height=25,
+            bold=True,
+            color=(0.75, 0.8, 0.9, 1)
+        )
+        timer_box.add_widget(timer_title)
+        
+        timer_box.add_widget(Widget(size_hint=(1, None), height=10))
+        
+        timer_container = BoxLayout(orientation='horizontal', spacing=20, size_hint=(1, None), height=45)
+        timer_container.add_widget(Widget(size_hint=(0.05, 1)))
 
         from kivy.uix.checkbox import CheckBox
-        self.timer_checkbox = CheckBox(size_hint=(None, None), size=(30, 30), active=False)
+        self.timer_checkbox = CheckBox(size_hint=(None, None), size=(28, 28), active=False)
         self.timer_checkbox.bind(active=self.toggle_timer_input)
         timer_container.add_widget(self.timer_checkbox)
 
-        timer_label = Label(text='Timer aktivieren', size_hint=(None, 1), width=150, font_size='18sp', bold=True, color=(0.9, 0.9, 1, 1))
+        timer_label = Label(text='Timer aktivieren', size_hint=(None, 1), width=140, font_size='17sp', bold=True, color=(0.9, 0.92, 1, 1), halign='left')
+        timer_label.bind(size=lambda l, s: setattr(l, 'text_size', (s[0], None)))
         timer_container.add_widget(timer_label)
 
-        timer_container.add_widget(Widget(size_hint=(0.1, 1)))
+        timer_container.add_widget(Widget(size_hint=(1, 1)))
 
-        self.time_input = TextInput(text='10', multiline=False, size_hint=(None, None), size=(80, 35), font_size='16sp', input_filter='int', disabled=True, background_color=(0.2, 0.2, 0.25, 1), foreground_color=(1, 1, 1, 1), padding=[10, 8])
+        self.time_input = TextInput(text='10', multiline=False, size_hint=(None, None), size=(70, 38), font_size='18sp', input_filter='int', disabled=True, background_color=(0.22, 0.24, 0.28, 1), foreground_color=(1, 1, 1, 1), padding=[12, 8], halign='center')
         timer_container.add_widget(self.time_input)
 
-        time_info = Label(text='Minuten pro Spieler', size_hint=(None, 1), width=200, font_size='16sp', color=(0.8, 0.8, 0.9, 1))
+        time_info = Label(text='Minuten', size_hint=(None, 1), width=80, font_size='16sp', color=(0.75, 0.78, 0.88, 1))
         timer_container.add_widget(time_info)
+        
+        timer_container.add_widget(Widget(size_hint=(0.05, 1)))
 
         timer_box.add_widget(timer_container)
         panel.add_widget(timer_box)
 
         # Button-Leiste unten
-        button_bar = BoxLayout(orientation='horizontal', spacing=30, size_hint=(1, 0.12), padding=[100, 10, 100, 10])
-        back_btn = Button(text='Zurück', font_size='23sp', bold=True, background_color=(0.6, 0.3, 0.3, 1))
+        button_bar = BoxLayout(orientation='horizontal', spacing=25, size_hint=(1, 0.13), padding=[50, 15, 50, 15])
+        back_btn = Button(text='Zurück', font_size='22sp', bold=True, background_color=(0.55, 0.3, 0.3, 1), size_hint=(0.4, 1))
         back_btn.bind(on_press=self.go_back)
         button_bar.add_widget(back_btn)
-        start_btn = Button(text='Spiel starten', font_size='23sp', bold=True, background_color=(0.2, 0.7, 0.3, 1))
+        start_btn = Button(text='Spiel starten', font_size='22sp', bold=True, background_color=(0.2, 0.65, 0.3, 1), size_hint=(0.6, 1))
         start_btn.bind(on_press=self.start_game)
         button_bar.add_widget(start_btn)
         panel.add_widget(button_bar)
@@ -762,6 +805,24 @@ class PlayerSelectionScreen(Screen):
     def _update_panel(self, instance, value):
         self.panel_rect.pos = instance.pos
         self.panel_rect.size = instance.size
+
+    def _update_separator(self, instance, value):
+        """Zentriert die horizontale Trennlinie."""
+        margin = instance.width * 0.2
+        self.sep_rect.pos = (instance.x + margin, instance.y)
+        self.sep_rect.size = (instance.width * 0.6, 2)
+
+    def _update_vsep(self, instance, value):
+        """Zentriert die vertikale Trennlinie."""
+        margin = instance.height * 0.1
+        self.vsep_rect.pos = (instance.x, instance.y + margin)
+        self.vsep_rect.size = (instance.width, instance.height * 0.8)
+
+    def _update_timer_sep(self, instance, value):
+        """Update horizontale Trennlinie vor Timer."""
+        margin = instance.width * 0.1
+        self.timer_sep_rect.pos = (instance.x + margin, instance.y)
+        self.timer_sep_rect.size = (instance.width * 0.8, instance.height)
 
     def update_bg(self, *args):
         self.bg_rect.pos = self.pos
@@ -882,13 +943,26 @@ class GameScreen(Screen):
         pause_btn.bind(on_press=self.show_pause_menu)
         top_bar.add_widget(pause_btn)
         
-        # Info Label (für Spielernamen)
+        # Info Label (für Spielernamen) - mit Hintergrund und Rahmen
+        info_container = BoxLayout(size_hint=(0.9, 1), padding=[15, 8])
+        with info_container.canvas.before:
+            # Rahmen (blau-grauer Akzent passend zum Theme)
+            Color(0.4, 0.5, 0.7, 0.9)
+            self.info_border_rect = Rectangle()
+            # Hintergrund
+            Color(0.15, 0.17, 0.22, 0.95)
+            self.info_bg_rect = Rectangle()
+        info_container.bind(pos=self._update_info_bg, size=self._update_info_bg)
+        
         self.info_label = Label(
-            text='Weiß am Zug',
-            size_hint=(0.9, 1),
-            font_size='18sp'
+            text='[b]WEISS AM ZUG[/b]',
+            size_hint=(1, 1),
+            font_size='24sp',
+            markup=True,
+            color=(1, 1, 1, 1)
         )
-        top_bar.add_widget(self.info_label)
+        info_container.add_widget(self.info_label)
+        top_bar.add_widget(info_container)
         
         main_layout.add_widget(top_bar)
         
@@ -975,34 +1049,53 @@ class GameScreen(Screen):
         separator = Sep(size_hint=(1, 0.02))
         right_panel.add_widget(separator)
         
-        # Zughistorie
-        history_box = BoxLayout(orientation='vertical', size_hint=(1, 0.63), spacing=5)
+        # Zughistorie mit Rahmen (verkürzt für zukünftiges Menü)
+        history_box = BoxLayout(orientation='vertical', size_hint=(1, 0.48), spacing=8, padding=[10, 10])
+        
+        # Rahmen und Hintergrund
+        with history_box.canvas.before:
+            # Rahmen (blauer Akzent)
+            Color(0.3, 0.4, 0.6, 0.8)
+            self.history_border_rect = Rectangle()
+            # Hintergrund
+            Color(0.15, 0.18, 0.22, 0.9)
+            self.history_bg_rect = Rectangle()
+        history_box.bind(pos=self._update_history_box, size=self._update_history_box)
         
         history_title = Label(
-            text='Zughistorie',
+            text='ZUGHISTORIE',
             font_size='20sp',
-            size_hint=(1, 0.1),
-            bold=True
+            size_hint=(1, None),
+            height=30,
+            bold=True,
+            color=(0.9, 0.92, 1, 1)
         )
         history_box.add_widget(history_title)
         
         from kivy.uix.scrollview import ScrollView
-        scroll = ScrollView(size_hint=(1, 0.9))
+        scroll = ScrollView(size_hint=(1, 1), do_scroll_x=False)
         
         self.history_label = Label(
             text='Noch keine Züge',
-            font_size='16sp',
+            font_size='22sp',
             size_hint_y=None,
             halign='left',
-            valign='top'
+            valign='top',
+            color=(0.85, 0.87, 0.95, 1),
+            padding=[5, 5],
+            markup=True
         )
         self.history_label.bind(texture_size=self.history_label.setter('size'))
-        self.history_label.bind(size=self.history_label.setter('text_size'))
+        self.history_label.bind(width=lambda instance, value: setattr(instance, 'text_size', (value, None)))
         
         scroll.add_widget(self.history_label)
         history_box.add_widget(scroll)
         
         right_panel.add_widget(history_box)
+        
+        # Platzhalter für zukünftiges Menü (ca. 15% Höhe)
+        # menu_placeholder = BoxLayout(size_hint=(1, 0.15))
+        # right_panel.add_widget(menu_placeholder)
         
         game_layout.add_widget(right_panel)
         
@@ -1021,6 +1114,24 @@ class GameScreen(Screen):
             self.controller.set_board_widget(self.board)
             self.controller.set_game_screen(self)
             self.board.set_controller(self.controller)
+    
+    def _update_info_bg(self, instance, value):
+        # Rahmen (3px breit)
+        border_width = 3
+        self.info_border_rect.pos = instance.pos
+        self.info_border_rect.size = instance.size
+        # Hintergrund (innerhalb des Rahmens)
+        self.info_bg_rect.pos = (instance.x + border_width, instance.y + border_width)
+        self.info_bg_rect.size = (instance.width - 2 * border_width, instance.height - 2 * border_width)
+    
+    def _update_history_box(self, instance, value):
+        """Aktualisiert Rahmen und Hintergrund der Zughistorie."""
+        border_width = 2
+        self.history_border_rect.pos = instance.pos
+        self.history_border_rect.size = instance.size
+        # Hintergrund (innerhalb des Rahmens)
+        self.history_bg_rect.pos = (instance.x + border_width, instance.y + border_width)
+        self.history_bg_rect.size = (instance.width - 2 * border_width, instance.height - 2 * border_width)
     
     def _update_white_timer_bg(self, instance, value):
         self.white_timer_bg.pos = instance.pos
@@ -1076,14 +1187,18 @@ class GameScreen(Screen):
         """
         if current_turn == 'white':
             if self.white_player:
-                self.info_label.text = f"{self.white_player['username']} (Weiß) am Zug"
+                # white_player ist ein Tuple: (player_dict, username)
+                username = self.white_player[1] if isinstance(self.white_player, tuple) else self.white_player.get('username', 'Weiß')
+                self.info_label.text = f"[b][color=FFFFFF]{username}[/color] (WEISS) AM ZUG[/b]"
             else:
-                self.info_label.text = "Weiß ist am Zug"
+                self.info_label.text = "[b][color=FFFFFF]WEISS[/color] AM ZUG[/b]"
         else:
             if self.black_player:
-                self.info_label.text = f"{self.black_player['username']} (Schwarz) am Zug"
+                # black_player ist ein Tuple: (player_dict, username)
+                username = self.black_player[1] if isinstance(self.black_player, tuple) else self.black_player.get('username', 'Schwarz')
+                self.info_label.text = f"[b][color=FFFFFF]{username}[/color] (SCHWARZ) AM ZUG[/b]"
             else:
-                self.info_label.text = "Schwarz am Zug"
+                self.info_label.text = "[b][color=FFFFFF]SCHWARZ[/color] AM ZUG[/b]"
     
     def update_move_history(self, move_history):
         """
@@ -1099,19 +1214,27 @@ class GameScreen(Screen):
             self.history_label.text = 'Noch keine Züge'
             return
         
-        # Formatiere Züge in lesbarer Form
+        # Formatiere Züge mit Farben für weiß und schwarz
         text = ""
         for i, move in enumerate(move_history, 1):
             notation = self.controller.get_move_notation(move)
             
-            # Zeige als Zugpaar (weiß + schwarz)
+            # Farbe basierend auf Spieler (ungerade = weiß, gerade = schwarz)
             if i % 2 == 1:
+                # Weißer Zug - hellere Farbe
                 move_number = (i + 1) // 2
-                text += f"{move_number}. {notation}"
+                text += f"[b][color=D0D0E0]{move_number}.[/color][/b] [color=FFFFFF]{notation}[/color]"
             else:
-                text += f" {notation}\n"
+                # Schwarzer Zug - leicht gedämpfte Farbe
+                text += f"  [color=C0C0D0]{notation}[/color]\n"
+        
+        # Füge Newline am Ende hinzu wenn ungerade Anzahl
+        if len(move_history) % 2 == 1:
+            text += "\n"
         
         self.history_label.text = text
+        # Erzwinge Update der Größe für Scrolling
+        self.history_label.texture_update()
     
     def show_pause_menu(self, instance):
         if self.controller:
@@ -1148,9 +1271,10 @@ class StatsMenuScreen(Screen):
     def __init__(self, controller=None, **kwargs):
         super().__init__(**kwargs)
         self.controller = controller
-        # Semi-transparent dark overlay matching Pause/Start
+        
+        # Dunkler Hintergrund wie im Hauptmenü
         with self.canvas.before:
-            Color(0, 0, 0, 0.85)
+            Color(0.1, 0.12, 0.18, 1)
             self.bg_rect = Rectangle(pos=self.pos, size=self.size)
         self.bind(pos=self.update_bg, size=self.update_bg)
 
@@ -1160,18 +1284,18 @@ class StatsMenuScreen(Screen):
         # Centered panel
         panel = BoxLayout(orientation='vertical', spacing=20)
         with panel.canvas.before:
-            Color(0.15, 0.15, 0.2, 0.95)
+            Color(0.15, 0.17, 0.22, 0.95)
             self.panel_rect = Rectangle()
         panel.bind(pos=self._update_panel, size=self._update_panel)
 
         # Title
         title_box = BoxLayout(orientation='vertical', size_hint=(1, 0.2), padding=[0, 20, 0, 10])
         title = Label(
-            text='STATISTIKEN & HISTORIE',
+            text='STATISTIKEN',
             font_size='48sp',
             size_hint=(1, 1),
             bold=True,
-            color=(0.9, 0.9, 1, 1)
+            color=(0.95, 0.95, 1, 1)
         )
         title_box.add_widget(title)
         panel.add_widget(title_box)
@@ -1181,8 +1305,7 @@ class StatsMenuScreen(Screen):
         with separator.canvas:
             Color(0.4, 0.4, 0.5, 1)
             self.sep_rect_stats = Rectangle()
-        separator.bind(pos=lambda i, v: setattr(self.sep_rect_stats, 'pos', (i.x + i.width * 0.2, i.y)),
-                       size=lambda i, v: setattr(self.sep_rect_stats, 'size', (i.width * 0.6, 2)))
+        separator.bind(pos=self._update_separator_stats, size=self._update_separator_stats)
         panel.add_widget(separator)
 
         # Button container
@@ -1249,10 +1372,18 @@ class StatsMenuScreen(Screen):
             self.manager.current = 'menu'
     
     def _update_panel(self, instance, value):
+        """Update panel rectangle."""
         self.panel_rect.pos = instance.pos
         self.panel_rect.size = instance.size
     
+    def _update_separator_stats(self, instance, value):
+        """Aktualisiert Separator Position und Größe - zentriert."""
+        margin = instance.width * 0.2
+        self.sep_rect_stats.pos = (instance.x + margin, instance.y + instance.height / 2 - 1)
+        self.sep_rect_stats.size = (instance.width - 2 * margin, 2)
+    
     def update_bg(self, *args):
+        """Update background rectangle."""
         self.bg_rect.pos = self.pos
         self.bg_rect.size = self.size
 
@@ -1264,32 +1395,55 @@ class LeaderboardScreen(Screen):
         self.controller = controller
         self.db = DatabaseManager()
         
-        layout = BoxLayout(orientation='vertical', padding=30, spacing=15)
+        # Dunkler Hintergrund wie im Hauptmenü
+        with self.canvas.before:
+            Color(0.1, 0.12, 0.18, 1)
+            self.bg_rect = Rectangle(pos=self.pos, size=self.size)
+        self.bind(pos=self.update_bg, size=self.update_bg)
+        
+        # Hauptlayout mit Padding
+        main_layout = BoxLayout(orientation='vertical', padding=[100, 50, 100, 50], spacing=20)
+        
+        # Panel
+        panel = BoxLayout(orientation='vertical', spacing=15, padding=20)
+        with panel.canvas.before:
+            Color(0.15, 0.17, 0.22, 0.95)
+            self.panel_rect = Rectangle()
+        panel.bind(pos=self._update_panel, size=self._update_panel)
         
         # Titel
         title = Label(
-            text='Rangliste',
-            font_size='36sp',
+            text='RANGLISTE',
+            font_size='42sp',
             size_hint=(1, 0.12),
-            bold=True
+            bold=True,
+            color=(0.95, 0.95, 1, 1)
         )
-        layout.add_widget(title)
+        panel.add_widget(title)
+        
+        # Trennlinie
+        separator = Widget(size_hint=(1, None), height=2)
+        with separator.canvas:
+            Color(0.4, 0.4, 0.5, 1)
+            self.sep_rect = Rectangle()
+        separator.bind(pos=self._update_separator, size=self._update_separator)
+        panel.add_widget(separator)
         
         # Tabellenkopf
         header = BoxLayout(orientation='horizontal', size_hint=(1, 0.08), padding=[10, 5])
-        header.add_widget(Label(text='Rang', font_size='18sp', bold=True, size_hint=(0.15, 1)))
-        header.add_widget(Label(text='Spieler', font_size='18sp', bold=True, size_hint=(0.35, 1), halign='left'))
-        header.add_widget(Label(text='Punkte', font_size='18sp', bold=True, size_hint=(0.2, 1)))
-        header.add_widget(Label(text='Spiele', font_size='18sp', bold=True, size_hint=(0.15, 1)))
-        header.add_widget(Label(text='Siege', font_size='18sp', bold=True, size_hint=(0.15, 1)))
+        header.add_widget(Label(text='Rang', font_size='18sp', bold=True, size_hint=(0.15, 1), color=(0.9, 0.9, 1, 1)))
+        header.add_widget(Label(text='Spieler', font_size='18sp', bold=True, size_hint=(0.35, 1), halign='left', color=(0.9, 0.9, 1, 1)))
+        header.add_widget(Label(text='Punkte', font_size='18sp', bold=True, size_hint=(0.2, 1), color=(0.9, 0.9, 1, 1)))
+        header.add_widget(Label(text='Spiele', font_size='18sp', bold=True, size_hint=(0.15, 1), color=(0.9, 0.9, 1, 1)))
+        header.add_widget(Label(text='Siege', font_size='18sp', bold=True, size_hint=(0.15, 1), color=(0.9, 0.9, 1, 1)))
         
         # Header Hintergrund
         with header.canvas.before:
-            Color(0.2, 0.3, 0.4, 1)
+            Color(0.2, 0.25, 0.3, 1)
             self.header_rect = Rectangle()
         header.bind(pos=self._update_header_rect, size=self._update_header_rect)
         
-        layout.add_widget(header)
+        panel.add_widget(header)
         
         # Scrollbare Liste
         from kivy.uix.scrollview import ScrollView
@@ -1303,19 +1457,35 @@ class LeaderboardScreen(Screen):
         self.leaderboard_container.bind(minimum_height=self.leaderboard_container.setter('height'))
         
         scroll.add_widget(self.leaderboard_container)
-        layout.add_widget(scroll)
+        panel.add_widget(scroll)
         
         # Zurück Button
         back_btn = Button(
             text='Zurück',
-            font_size='20sp',
+            font_size='22sp',
             size_hint=(1, 0.1),
-            background_color=(0.6, 0.3, 0.3, 1)
+            background_color=(0.6, 0.3, 0.3, 1),
+            bold=True
         )
         back_btn.bind(on_press=self.go_back)
-        layout.add_widget(back_btn)
+        panel.add_widget(back_btn)
         
-        self.add_widget(layout)
+        main_layout.add_widget(panel)
+        self.add_widget(main_layout)
+    
+    def _update_panel(self, instance, value):
+        self.panel_rect.pos = instance.pos
+        self.panel_rect.size = instance.size
+    
+    def _update_separator(self, instance, value):
+        """Zentriert die horizontale Trennlinie."""
+        margin = instance.width * 0.2
+        self.sep_rect.pos = (instance.x + margin, instance.y)
+        self.sep_rect.size = (instance.width * 0.6, 2)
+    
+    def update_bg(self, *args):
+        self.bg_rect.pos = self.pos
+        self.bg_rect.size = self.size
     
     def _update_header_rect(self, instance, value):
         self.header_rect.pos = instance.pos
@@ -1432,16 +1602,39 @@ class GameHistoryScreen(Screen):
         self.controller = controller
         self.db = DatabaseManager()
         
-        layout = BoxLayout(orientation='vertical', padding=30, spacing=15)
+        # Dunkler Hintergrund wie im Hauptmenü
+        with self.canvas.before:
+            Color(0.1, 0.12, 0.18, 1)
+            self.bg_rect = Rectangle(pos=self.pos, size=self.size)
+        self.bind(pos=self.update_bg, size=self.update_bg)
+        
+        # Hauptlayout mit Padding
+        main_layout = BoxLayout(orientation='vertical', padding=[100, 50, 100, 50], spacing=20)
+        
+        # Panel
+        panel = BoxLayout(orientation='vertical', spacing=15, padding=20)
+        with panel.canvas.before:
+            Color(0.15, 0.17, 0.22, 0.95)
+            self.panel_rect = Rectangle()
+        panel.bind(pos=self._update_panel, size=self._update_panel)
         
         # Titel
         title = Label(
-            text='Spielhistorie',
-            font_size='36sp',
+            text='SPIELHISTORIE',
+            font_size='42sp',
             size_hint=(1, 0.1),
-            bold=True
+            bold=True,
+            color=(0.95, 0.95, 1, 1)
         )
-        layout.add_widget(title)
+        panel.add_widget(title)
+        
+        # Trennlinie
+        separator = Widget(size_hint=(1, None), height=2)
+        with separator.canvas:
+            Color(0.4, 0.4, 0.5, 1)
+            self.sep_rect = Rectangle()
+        separator.bind(pos=self._update_separator, size=self._update_separator)
+        panel.add_widget(separator)
         
         # Scrollbare Liste
         from kivy.uix.scrollview import ScrollView
@@ -1453,25 +1646,42 @@ class GameHistoryScreen(Screen):
             size_hint_y=None,
             halign='left',
             valign='top',
-            markup=True
+            markup=True,
+            color=(0.9, 0.9, 1, 1)
         )
         self.history_label.bind(texture_size=self.history_label.setter('size'))
         self.history_label.bind(size=self.history_label.setter('text_size'))
         
         scroll.add_widget(self.history_label)
-        layout.add_widget(scroll)
+        panel.add_widget(scroll)
         
         # Zurück Button
         back_btn = Button(
             text='Zurück',
-            font_size='20sp',
+            font_size='22sp',
             size_hint=(1, 0.1),
-            background_color=(0.6, 0.3, 0.3, 1)
+            background_color=(0.6, 0.3, 0.3, 1),
+            bold=True
         )
         back_btn.bind(on_press=self.go_back)
-        layout.add_widget(back_btn)
+        panel.add_widget(back_btn)
         
-        self.add_widget(layout)
+        main_layout.add_widget(panel)
+        self.add_widget(main_layout)
+    
+    def _update_panel(self, instance, value):
+        self.panel_rect.pos = instance.pos
+        self.panel_rect.size = instance.size
+    
+    def _update_separator(self, instance, value):
+        """Zentriert die horizontale Trennlinie."""
+        margin = instance.width * 0.2
+        self.sep_rect.pos = (instance.x + margin, instance.y)
+        self.sep_rect.size = (instance.width * 0.6, 2)
+    
+    def update_bg(self, *args):
+        self.bg_rect.pos = self.pos
+        self.bg_rect.size = self.size
     
     def on_pre_enter(self):
         """Lädt die Spielhistorie, wenn der Screen geöffnet wird."""
@@ -1518,9 +1728,9 @@ class PauseMenuScreen(Screen):
         super().__init__(**kwargs)
         self.controller = controller
         
-        # Semi-transparent background mit Blur-Effekt
+        # Dunkler Hintergrund wie im Hauptmenü
         with self.canvas.before:
-            Color(0, 0, 0, 0.85)
+            Color(0.1, 0.12, 0.18, 1)
             self.bg_rect = Rectangle(pos=self.pos, size=self.size)
         self.bind(pos=self.update_bg, size=self.update_bg)
         
@@ -1532,7 +1742,7 @@ class PauseMenuScreen(Screen):
         
         # Panel-Hintergrund (dunkel mit Rahmen)
         with panel.canvas.before:
-            Color(0.15, 0.15, 0.2, 0.95)
+            Color(0.15, 0.17, 0.22, 0.95)
             self.panel_rect = Rectangle()
         panel.bind(pos=self._update_panel, size=self._update_panel)
         
@@ -1543,7 +1753,7 @@ class PauseMenuScreen(Screen):
             font_size='48sp',
             size_hint=(1, 1),
             bold=True,
-            color=(0.9, 0.9, 1, 1)
+            color=(0.95, 0.95, 1, 1)
         )
         title_box.add_widget(title)
         panel.add_widget(title_box)
@@ -1553,8 +1763,7 @@ class PauseMenuScreen(Screen):
         with separator.canvas:
             Color(0.4, 0.4, 0.5, 1)
             self.sep_rect = Rectangle()
-        separator.bind(pos=lambda i, v: setattr(self.sep_rect, 'pos', (i.x + i.width * 0.2, i.y)),
-                      size=lambda i, v: setattr(self.sep_rect, 'size', (i.width * 0.6, 2)))
+        separator.bind(pos=self._update_separator, size=self._update_separator)
         panel.add_widget(separator)
         
         # Button container mit mehr Platz
@@ -1617,6 +1826,12 @@ class PauseMenuScreen(Screen):
     def _update_panel(self, instance, value):
         self.panel_rect.pos = instance.pos
         self.panel_rect.size = instance.size
+    
+    def _update_separator(self, instance, value):
+        """Zentriert die horizontale Trennlinie."""
+        margin = instance.width * 0.2
+        self.sep_rect.pos = (instance.x + margin, instance.y)
+        self.sep_rect.size = (instance.width * 0.6, 2)
     
     def update_bg(self, *args):
         self.bg_rect.pos = self.pos

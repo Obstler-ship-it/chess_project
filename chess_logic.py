@@ -1,28 +1,28 @@
 from board import Board
 from move import Move
 from pieces import Piece
-from typing import Optional
+from typing import Optional, Union
 
-class chess_logic:
-    """ Überprüft auf höchster Ebene die Zulässigkeit von Zügen"""
+class ChessLogic:
+    """Überprüft auf höchster Ebene die Zulässigkeit von Zügen."""
 
     def __init__(self, bd: Board):
         self.bd = bd
         self._all_moves = []
 
     @property
-    def get_white_pieces(self) -> list:
-        """ Gibt eine Liste mit allen existierenden Figuren zurück """
+    def white_pieces(self) -> list[Piece]:
+        """Gibt eine Liste mit allen existierenden weißen Figuren zurück."""
         return self.bd.white_pieces
     
     @property
-    def all_moves(self) -> list:
-        """ Gibt eine Liste mit allen existierenden Zügen zurück """
+    def all_moves(self) -> list[Move]:
+        """Gibt eine Liste mit allen existierenden Zügen zurück."""
         return self._all_moves
     
     @property
-    def get_black_pieces(self) -> list:
-        """ Gibt eine Liste mit allen existierenden Figuren zurück """
+    def black_pieces(self) -> list[Piece]:
+        """Gibt eine Liste mit allen existierenden schwarzen Figuren zurück."""
         return self.bd.black_pieces
     
     def calculate_all_moves(self) -> list[Move]:
@@ -39,8 +39,10 @@ class chess_logic:
 
         return self._all_moves
 
-    def all_legal_moves(self, last_move: Move, curent_turn: str) -> list[Move] or str:
-        """ Gibt alle legalen Züge zurück.
+    def all_legal_moves(
+        self, last_move: Move, current_turn: str
+    ) -> Union[list[Move], str]:
+        """Gibt alle legalen Züge zurück.
         
         Überprüft:
             - Ob Züge den König ins Schach setzen würden
@@ -48,30 +50,29 @@ class chess_logic:
             - Ob Bauern-Promotion nötig ist
             - En passant basierend auf last_move
             
-        :param: last_move, Move-Objekt des letzten Zugs (für En passant)
-        :param: curent_turn, Farbe des aktuellen Spielers
-        :return: Liste aller legalen Züge
+        Args:
+            last_move: Move-Objekt des letzten Zugs (für En passant)
+            current_turn: Farbe des aktuellen Spielers ('white' oder 'black')
+            
+        Returns:
+            Liste aller legalen Züge oder 'checkmate'/'stalemate'
         """
 
         legal_moves = []
         self.calculate_all_moves()
 
-        if self.bd.white_king.color == curent_turn:
-            king = self.bd.white_king
-        else:
-            king = self.bd.black_king
-
+        king = self._get_king(current_turn)
         if king is None:
             raise ValueError('King not found!')
 
         for move in self.all_moves:
             piece = move.piece
 
-            if piece.color != curent_turn:
+            if piece.color != current_turn:
                 continue
                 
             # En-passant prüfen
-            if move.en_passant:
+            if move.en_passant and move.captured:
                 if not self.en_passant(move.captured, last_move):
                     continue
 
@@ -90,20 +91,41 @@ class chess_logic:
 
         return legal_moves
 
-    def en_passant(self, captured: Piece, last_move: Move) -> bool:
-        """ Zu schlagende Figur muss direkt vorher gezogen haben """
+    def _get_king(self, color: str) -> Optional[Piece]:
+        """Gibt den König der angegebenen Farbe zurück.
+        
+        Args:
+            color: 'white' oder 'black'
+            
+        Returns:
+            King-Objekt der entsprechenden Farbe oder None
+        """
+        return (
+            self.bd.white_king if color == 'white'
+            else self.bd.black_king
+        )
 
-        if last_move.piece == captured:
-            return True
-        return False
+    def en_passant(self, captured: Piece, last_move: Move) -> bool:
+        """Zu schlagende Figur muss direkt vorher gezogen haben.
+        
+        Args:
+            captured: Die zu schlagende Figur
+            last_move: Der letzte ausgeführte Zug
+            
+        Returns:
+            True wenn En passant gültig ist
+        """
+        return last_move.piece == captured
 
     def is_in_check(self, king: Piece, all_moves: list[Move]) -> bool:
-        """
-        Prüft ob der König im Schach steht.
+        """Prüft ob der König im Schach steht.
         
-        :param king_pos: Position des Königs
-        :param all_moves: Liste aller möglichen Züge
-        :return: True wenn König im Schach steht
+        Args:
+            king: König-Objekt
+            all_moves: Liste aller möglichen gegnerischen Züge
+            
+        Returns:
+            True wenn König im Schach steht
         """
 
         for move in all_moves:
@@ -113,30 +135,34 @@ class chess_logic:
         return False
     
     def would_leave_king_in_check(self, move: Move, king: Piece) -> bool:
-        """
-        Simuliert einen Zug und prüft ob der eigene König danach im Schach steht.
+        """Simuliert einen Zug und prüft ob der eigene König im Schach steht.
         
-        :param move: Zug-Tupel (row, col, captured, piece, ...)
-        :param color: Farbe des ziehenden Spielers
-        :return: True wenn Zug den eigenen König gefährdet
+        Args:
+            move: Der zu prüfende Zug
+            king: König-Objekt des ziehenden Spielers
+            
+        Returns:
+            True wenn Zug den eigenen König gefährdet
         """
 
-        Board_copy = self.bd.deep_copy()
+        board_copy = self.bd.deep_copy()
         legal_moves = []
 
         from_row, from_col = move.from_pos
 
         # Finde die entsprechende Figur im kopierten Board
-        piece_copy = Board_copy.squares[from_row, from_col]
+        piece_copy = board_copy.squares[from_row, from_col]
+        target_copy = None
         if move.captured is not None:
             target_pos = move.captured.position
-            target_copy = Board_copy.squares[target_pos]
-        else:
-            target_copy = None
+            target_copy = board_copy.squares[target_pos]
 
-        king_copy = Board_copy.white_king if king.color == 'white' else Board_copy.black_king
+        king_copy = (
+            board_copy.white_king if king.color == 'white'
+            else board_copy.black_king
+        )
 
-         # Move-Objekt erstellen mit kopierten Figuren
+        # Move-Objekt erstellen mit kopierten Figuren
         move_obj = Move(
             from_pos=(from_row, from_col),
             to_pos=move.to_pos,
@@ -145,44 +171,46 @@ class chess_logic:
         )
         
         # Zug im Board ausführen
-        Board_copy.make_move(move_obj)
+        board_copy.make_move(move_obj)
 
-        if king.color == 'white':
-            for piece in Board_copy.black_pieces:
-                get_moves = piece.get_legal_moves(Board_copy)
-                legal_moves.extend(get_moves)
-        else:
-            for piece in Board_copy.white_pieces:
-                get_moves = piece.get_legal_moves(Board_copy)
-                legal_moves.extend(get_moves)
+        # Berechne gegnerische Züge
+        opponent_pieces = (
+            board_copy.black_pieces if king.color == 'white'
+            else board_copy.white_pieces
+        )
+        for piece in opponent_pieces:
+            legal_moves.extend(piece.get_legal_moves(board_copy))
 
-        if self.is_in_check(king_copy, legal_moves):
+        if king_copy and self.is_in_check(king_copy, legal_moves):
             return True
         return False
 
-    def check_or_stalemate(self, king: Piece, all_moves) -> str:
-        """
-        Prüft ob Schachmatt vorliegt.
+    def check_or_stalemate(
+        self, king: Piece, all_moves: list[Move]
+    ) -> str:
+        """Prüft ob Schachmatt oder Patt vorliegt.
         
-        :param color: Farbe des Spielers der am Zug ist
-        :return: True wenn Schachmatt
+        Args:
+            king: König-Objekt des Spielers am Zug
+            all_moves: Alle möglichen gegnerischen Züge
+            
+        Returns:
+            'checkmate' oder 'stalemate'
         """
         # Keine legalen Züge verfügbar und König im Schach
-        if self.is_in_check(king, all_moves):
-            return 'checkmate'
-        else:
-            return 'stalemate'
+        return 'checkmate' if self.is_in_check(king, all_moves) else 'stalemate'
 
-    def castle(self, king: Piece) -> list:
-        """
-        Prüft ob Rochade möglich ist.
+    def castle(self, king: Piece) -> list[Move]:
+        """Prüft ob Rochade möglich ist.
         
-        :param color: 'white' oder 'black'
-        :param side: 'kingside' oder 'queenside'
-        :return: True wenn Rochade möglich ist
+        Args:
+            king: König-Objekt
+            
+        Returns:
+            Liste mit möglichen Rochade-Zügen (0-2 Züge)
         """
 
-        if king.moved:
+        if not hasattr(king, 'moved') or king.moved:
             return []
         
         if self.is_in_check(king, self.all_moves):
@@ -194,58 +222,64 @@ class chess_logic:
         rook2 = self.bd.squares[king_row, 7]  # Kingside
 
         # Queenside (lange Rochade): König nach c (col=2), Turm nach d (col=3)
-        if hasattr(rook1, 'moved') and rook1.moved is False:
-            can_castle = True
-            
-            # Prüfe ob Felder zwischen König und Turm frei sind (cols 1, 2, 3)
-            for col in [1, 2, 3]:
-                if self.bd.squares[king_row, col] is not None:
-                    can_castle = False
-                    break
-            
-            # Prüfe ob König durch Schach ziehen würde (cols 2, 3)
+        if hasattr(rook1, 'moved') and not rook1.moved:
+            can_castle = self._check_castling_path(
+                king, king_row, [1, 2, 3], [2, 3]
+            )
             if can_castle:
-                for col in [2, 3]:
-                    king_pos = (king_row, col)
-                    move = Move(
-                        from_pos=king.position,
-                        to_pos=king_pos,
-                        piece=king
+                moves.append(
+                    Move(
+                        king.position, (king_row, 2), king,
+                        None, castelling=rook1
                     )
-                    if self.would_leave_king_in_check(move, king):
-                        can_castle = False
-                        break
-            
-            if can_castle:
-                moves.append(Move(king.position, (king_row, 2), king, None, castelling=rook1))
+                )
 
         # Kingside (kurze Rochade): König nach g (col=6), Turm nach f (col=5)
-        if hasattr(rook2, 'moved') and rook2.moved is False:
-            can_castle = True
-            
-            # Prüfe ob Felder zwischen König und Turm frei sind (cols 5, 6)
-            for col in [5, 6]:
-                if self.bd.squares[king_row, col] is not None:
-                    can_castle = False
-                    break
-            
-            # Prüfe ob König durch Schach ziehen würde (cols 5, 6)
+        if hasattr(rook2, 'moved') and not rook2.moved:
+            can_castle = self._check_castling_path(
+                king, king_row, [5, 6], [5, 6]
+            )
             if can_castle:
-                for col in [5, 6]:
-                    king_pos = (king_row, col)
-                    move = Move(
-                        from_pos=king.position,
-                        to_pos=king_pos,
-                        piece=king
+                moves.append(
+                    Move(
+                        king.position, (king_row, 6), king,
+                        None, castelling=rook2
                     )
-                    if self.would_leave_king_in_check(move, king):
-                        can_castle = False
-                        break
-            
-            if can_castle:
-                moves.append(Move(king.position, (king_row, 6), king, None, castelling=rook2))
+                )
         
         return moves
+
+    def _check_castling_path(
+        self, king: Piece, king_row: int,
+        empty_cols: list[int], check_cols: list[int]
+    ) -> bool:
+        """Prüft ob der Weg für Rochade frei ist.
+        
+        Args:
+            king: König-Objekt
+            king_row: Reihe des Königs
+            empty_cols: Spalten die leer sein müssen
+            check_cols: Spalten durch die der König nicht im Schach ziehen darf
+            
+        Returns:
+            True wenn Rochade möglich ist
+        """
+        # Prüfe ob Felder frei sind
+        for col in empty_cols:
+            if self.bd.squares[king_row, col] is not None:
+                return False
+        
+        # Prüfe ob König durch Schach ziehen würde
+        for col in check_cols:
+            move = Move(
+                from_pos=king.position,
+                to_pos=(king_row, col),
+                piece=king
+            )
+            if self.would_leave_king_in_check(move, king):
+                return False
+        
+        return True
         
 
 
