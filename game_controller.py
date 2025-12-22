@@ -141,7 +141,7 @@ class GameController:
         self.move_history = []
         
         # Berechne initiale legale Züge
-        self.valid_moves = self.chess_logic.all_moves()  # Methode mit () aufrufen!
+        self.valid_moves = self.chess_logic.calculate_all_moves()  # Methode mit () aufrufen!
         
         # UI aktualisieren
         if self.board_widget:
@@ -301,16 +301,26 @@ class GameController:
             piece: Figur die bewegt wird
             target_pos: Zielposition (row, col)
         """
+        promo = False
+
         from_row, from_col = piece.position
         to_row, to_col = target_pos
-        
+
+        if piece.is_pawn:
+            target_row = to_row
+            if (piece.color == 'white' and target_row == 0) or (piece.color == 'black' and target_row == 7):
+                # Füge 4 Promotion-Optionen hinzu
+                for promo_type in ['Q', 'R', 'B', 'N']:
+                    promo = True
+                    raise NotImplementedError("Bauern-Promotion ist noch nicht implementiert.")
+                
         # Move-Objekt erstellen
         move = Move(
             from_pos=(from_row, from_col),
             to_pos=(to_row, to_col),
             piece=piece,
             captured=target,
-            promotion=None  # TODO: Bauern-Promotion implementieren
+            promotion=promo  
         )
         
         # Zug im Board ausführen
@@ -326,8 +336,6 @@ class GameController:
         self.current_turn = 'black' if self.current_turn == 'white' else 'white'
         
         # Gültige Züge für nächsten Spieler berechnen
-        self.chess_logic.last_move(move)
-        self.chess_logic.all_legal_moves(move, self.current_turn)
         self._update_valid_moves()
         
         # Auswahl aufheben

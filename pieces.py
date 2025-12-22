@@ -10,7 +10,7 @@ class Piece:
     # Rochade möglich Attribut/Methode
     def __init__(self, color: str, position: tuple, notation: str, is_pawn: bool = False):
         self.color = color
-        self.position = position
+        self._position = position
         self.notation = notation
         self.pawn = is_pawn
 
@@ -27,6 +27,16 @@ class Piece:
         """ Gibt den Pfad zum Bild der Figur zurück """
         return f'pieces/{self.color}_{self.notation}.png'
 
+    @property
+    def position(self) -> tuple:
+        """ Getter für die Position der Figur """
+        return self._position
+
+    @position.setter
+    def position(self, value: tuple):
+        """ Setter für die Position der Figur """
+        self._position = value
+    
     def __del__(self):
         """ War nur für Debug """
         # Destruktor: Wird aufgerufen, wenn Figur gelöscht wird

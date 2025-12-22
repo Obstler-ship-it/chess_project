@@ -1,6 +1,7 @@
 """ Diese Klasse stellt das Schachbrett mit allen Figuren als numpy 8x8 Array dar"""
 
 import numpy as np
+import copy
 from pieces import Piece, BlackPawn, WhitePawn, Rook, Knight, Queen, King, Bishop
 from move import Move
 
@@ -103,16 +104,22 @@ class Board:
     def remove_piece(self, piece: Piece):
         """Entfernt geschlagene Figur aus Listen."""
 
+        if piece == self.black_king or piece == self.white_king:
+            raise ValueError('Cannot remove the King from the board!')
+
         if piece in self.white_pieces:
             self.white_pieces.remove(piece)
 
         elif piece in self.black_pieces:
             self.black_pieces.remove(piece)
-
         else:
             raise ValueError('Unknown Piece!')
 
-    def make_move(self, last_move: Move) -> bool:
+    def deep_copy(self):
+        """Erstellt eine tiefe Kopie des Boards für Simulationen."""
+        return copy.deepcopy(self)
+
+    def make_move(self, last_move: Move):
         """ Zieht eine Figur auf dem Schachfeld """
 
         piece = last_move.piece
@@ -122,6 +129,27 @@ class Board:
         
         old_row, old_col = old_pos
         new_row, new_col = new_pos
+
+        if last_move.promotion:
+            # Erstelle neue Figur basierend auf der Promotion
+            if piece.color == 'white':
+                if last_move.promotion == 'Q':
+                    piece = Queen('white', new_pos)
+                elif last_move.promotion == 'R':
+                    piece = Rook('white', new_pos)
+                elif last_move.promotion == 'B':
+                    piece = Bishop('white', new_pos)
+                elif last_move.promotion == 'N':
+                    piece = Knight('white', new_pos)
+            else:
+                if last_move.promotion == 'Q':
+                    piece = Queen('black', new_pos)
+                elif last_move.promotion == 'R':
+                    piece = Rook('black', new_pos)
+                elif last_move.promotion == 'B':
+                    piece = Bishop('black', new_pos)
+                elif last_move.promotion == 'N':
+                    piece = Knight('black', new_pos)
 
         # Führe den Zug aus
         if (0 <= new_row < 8 and 0 <= new_col < 8):
@@ -146,9 +174,6 @@ class Board:
             if hasattr(piece, 'moved'):
                 piece.moved = True
             
-            return True
-        
-        return False
 
     def __str__(self):
         display = ""

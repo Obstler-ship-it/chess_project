@@ -8,7 +8,7 @@ class chess_logik:
 
     def __init__(self, bd: Board):
         self.bd = bd
-        self.last_moved_piece = None
+        self._all_moves = []
 
     @property
     def get_white_pieces(self) -> list:
@@ -16,35 +16,30 @@ class chess_logik:
         return self.bd.white_pieces
     
     @property
+    def all_moves(self) -> list:
+        """ Gibt eine Liste mit allen existierenden Zügen zurück """
+        return self._all_moves
+    
+    @property
     def get_black_pieces(self) -> list:
         """ Gibt eine Liste mit allen existierenden Figuren zurück """
         return self.bd.black_pieces
     
-    def all_moves(self):
+    def calculate_all_moves(self) -> list:
         """ Initialisiert alle legal_moves """
 
-        legal_moves = []
+        self._all_moves = []
 
         for piece in self.bd.white_pieces:
             get_moves = piece.get_legal_moves(self.bd)
-            legal_moves.extend(get_moves)
-
+            self._all_moves.extend(get_moves)
         for piece in self.bd.black_pieces:
             get_moves = piece.get_legal_moves(self.bd)
-            legal_moves.extend(get_moves)
+            self._all_moves.extend(get_moves)
 
-        return legal_moves
+        return self._all_moves
 
-    def last_move(self, last_move: Move):
-        """ Speichert die letzt bewegte Figur ab """
-
-        if last_move:
-           pass
-            
-        else:
-            raise ValueError('last_move is None or False')
-
-    def all_legal_moves(self, last_move: Optional[Move], curent_turn: str) -> list:
+    def all_legal_moves(self, last_move: Move, curent_turn: str) -> list:
         """ Gibt alle legalen Züge zurück.
         
         Überprüft:
@@ -59,78 +54,67 @@ class chess_logik:
         """
 
         legal_moves = []
+        self.calculate_all_moves()
 
-        for move in self.all_moves():
+        if self.bd.white_king.color == curent_turn:
+            king = self.bd.white_king
+        else:
+            king = self.bd.black_king
+
+        if king is None:
+            raise ValueError('King not found!')
+
+        for move in self.all_moves:
             piece = move[3]
+            target = move[2]
+
             if piece.color != curent_turn:
                 continue
-
+                
             # En-passant prüfen
             if len(move) == 5 and move[4]:
-                if not last_move or not self.en_passant(move[2], last_move):
+                if not self.en_passant(target, last_move):
                     continue
-            
+
             # Prüfe ob Zug den eigenen König gefährdet
-            if self.would_leave_king_in_check(move, curent_turn):
+            if self.would_leave_king_in_check(move, curent_turn, king):
                 continue
-            
-            # Bauern-Promotion: Wenn Bauer letzte Reihe erreicht
-            if piece.is_pawn:
-                target_row = move[0]
-                if (piece.color == 'white' and target_row == 0) or (piece.color == 'black' and target_row == 7):
-                    # Füge 4 Promotion-Optionen hinzu
-                    for promo_type in ['queen', 'rook', 'bishop', 'knight']:
-                        legal_moves.append((move[0], move[1], move[2], move[3], promo_type))
-                    continue
             
             legal_moves.append(move)
                 
         # Rochade prüfen
-        if curent_turn == 'black':
-            if self.can_castle('black', 'queenside'):
-                # (king_row, king_col, None, king, 'castling', side)
-                legal_moves.append((0, 2, None, self.bd.black_king, 'castling', 'queenside'))
-            if self.can_castle('black', 'kingside'):
-                legal_moves.append((0, 6, None, self.bd.black_king, 'castling', 'kingside'))
-        else:
-            if self.can_castle('white', 'queenside'):
-                legal_moves.append((7, 2, None, self.bd.white_king, 'castling', 'queenside'))
-            if self.can_castle('white', 'kingside'):
-                legal_moves.append((7, 6, None, self.bd.white_king, 'castling', 'kingside'))
-            
+        legal_moves.extend(self.castle(king))
+    
+        # Schachmatt/Stalemate prüfen
+        if legal_moves == []:
+            return [self.check_or_stalemate(king, self.all_moves)]
+
         return legal_moves
 
     def en_passant(self, target: Piece, last_move: Move) -> bool:
         """ Zu schlagende Figur muss direkt vorher gezogen haben """
-        if self.last_moved_piece == target:
+        if last_move.piece == target:
             if abs(last_move.from_pos[0] - last_move.to_pos[0]) == 2:
                 return True
         return False
 
-
-    def is_in_check(self, color: str) -> bool:
+    def is_in_check(self, king_pos: tuple, all_moves) -> bool:
         """
-        Prüft ob der König der angegebenen Farbe im Schach steht.
+        Prüft ob der König im Schach steht.
         
-        :param color: 'white' oder 'black'
+        :param king_pos: Position des Königs
+        :param all_moves: Liste aller möglichen Züge
         :return: True wenn König im Schach steht
         """
-        king = self.bd.white_king if color == 'white' else self.bd.black_king
-        king_pos = king.position
         
-        # Prüfe alle gegnerischen Figuren
-        enemy_pieces = self.bd.black_pieces if color == 'white' else self.bd.white_pieces
-        
-        for piece in enemy_pieces:
-            moves = piece.get_legal_moves(self.bd)
-            for move in moves:
-                target_pos = (move[0], move[1])
-                if target_pos == king_pos:
-                    return True
+        for move in all_moves:
+            target_pos = (move[0], move[1])
+            if target_pos == king_pos:
+                return True
         
         return False
     
-    def would_leave_king_in_check(self, move: tuple, color: str) -> bool:
+    def would_leave_king_in_check(self, move: tuple, color: str, king: Piece) -> bool:
         """
         Simuliert einen Zug und prüft ob der eigene König danach im Schach steht.
         
@@ -138,44 +122,46 @@ class chess_logik:
         :param color: Farbe des ziehenden Spielers
         :return: True wenn Zug den eigenen König gefährdet
         """
-        piece = move[3]
-        old_pos = piece.position
-        new_pos = (move[0], move[1])
-        captured = move[2]
-        
-        # Zug simulieren
-        old_row, old_col = old_pos
-        new_row, new_col = new_pos
-        
-        self.bd.squares[old_row, old_col] = None
-        temp_piece = self.bd.squares[new_row, new_col]
-        self.bd.squares[new_row, new_col] = piece
-        piece.position = new_pos
-        
-        # Geschlagene Figur temporär aus Liste entfernen
-        if captured:
-            if captured in self.bd.white_pieces:
-                self.bd.white_pieces.remove(captured)
-            elif captured in self.bd.black_pieces:
-                self.bd.black_pieces.remove(captured)
-        
-        # Prüfe Schach
-        in_check = self.is_in_check(color)
-        
-        # Zug rückgängig machen
-        self.bd.squares[old_row, old_col] = piece
-        self.bd.squares[new_row, new_col] = temp_piece
-        piece.position = old_pos
-        
-        if captured:
-            if captured.color == 'white':
-                self.bd.white_pieces.append(captured)
-            else:
-                self.bd.black_pieces.append(captured)
-        
-        return in_check
 
-    def is_checkmate(self, color: str) -> bool:
+        Board_copy = self.bd.deep_copy()
+        legal_moves = []
+        piece = move[3]
+        target = move[2]
+
+        from_row, from_col = piece.position
+        to_row, to_col = move[0:2]
+
+        # Finde die entsprechende Figur im kopierten Board
+        piece_copy = Board_copy.squares[from_row, from_col]
+        target_copy = Board_copy.squares[to_row, to_col] if target else None
+
+         # Move-Objekt erstellen mit kopierten Figuren
+        move_obj = Move(
+            from_pos=(from_row, from_col),
+            to_pos=(to_row, to_col),
+            piece=piece_copy,
+            captured=target_copy,
+            promotion=False
+        )
+        
+        # Zug im Board ausführen
+        Board_copy.make_move(move_obj)
+        
+        for piece in Board_copy.white_pieces:
+            get_moves = piece.get_legal_moves(Board_copy)
+            legal_moves.extend(get_moves)
+
+        for piece in Board_copy.black_pieces:
+            get_moves = piece.get_legal_moves(Board_copy)
+            legal_moves.extend(get_moves)
+
+        king_copy = Board_copy.white_king if color == 'white' else Board_copy.black_king
+
+        if self.is_in_check(king_copy.position, legal_moves):
+                 return True
+        return False
+
+    def check_or_stalemate(self, king: Piece, all_moves) -> str:
         """
         Prüft ob Schachmatt vorliegt.
         
@@ -183,23 +169,13 @@ class chess_logik:
         :return: True wenn Schachmatt
         """
         # Keine legalen Züge verfügbar und König im Schach
-        if len(self.all_legal_moves(None, color)) == 0:
-            return self.is_in_check(color)
-        return False
-    
-    def is_stalemate(self, color: str) -> bool:
-        """
-        Prüft ob Patt vorliegt.
-        
-        :param color: Farbe des Spielers der am Zug ist
-        :return: True wenn Patt
-        """
-        # Keine legalen Züge verfügbar aber König NICHT im Schach
-        if len(self.all_legal_moves(None, color)) == 0:
-            return not self.is_in_check(color)
-        return False
+        king_pos = king.position
+        if self.is_in_check(king_pos, all_moves):
+            return f'checkmate'
+        else:
+            return f'stalemate'
 
-    def can_castle(self, color: str, side: str) -> bool:
+    def castle(self, king: Piece) -> list:
         """
         Prüft ob Rochade möglich ist.
         
@@ -207,73 +183,42 @@ class chess_logik:
         :param side: 'kingside' oder 'queenside'
         :return: True wenn Rochade möglich ist
         """
-        if color == 'black':
-            king = self.bd.black_king
-            king_row = 0
-            
-            if side == 'queenside':
-                rook_col = 0
-                empty_cols = [1, 2, 3]
-            else:  # kingside
-                rook_col = 7
-                empty_cols = [5, 6]
-                
-        else:  # white
-            king = self.bd.white_king
-            king_row = 7
-            
-            if side == 'queenside':
-                rook_col = 0
-                empty_cols = [1, 2, 3]
-            else:  # kingside
-                rook_col = 7
-                empty_cols = [5, 6]
-        
-        # König darf nicht bewegt worden sein
-        if king.moved:
-            return False
-        
-        # Turm muss existieren und darf nicht bewegt worden sein
-        rook = self.bd.squares[king_row, rook_col]
-        if rook is None or not hasattr(rook, 'moved') or rook.moved:
-            return False
-        
-        # Felder zwischen König und Turm müssen leer sein
-        for col in empty_cols:
-            if self.bd.squares[king_row, col] is not None:
-                return False
-        
-        # König darf nicht im Schach stehen
-        if self.is_in_check(color):
-            return False
-        
-        # König darf nicht durch Schach ziehen (nur mittleres Feld prüfen)
-        king_col = 4
-        if side == 'queenside':
-            check_cols = [3, 2]  # König zieht über diese Felder
-        else:
-            check_cols = [5, 6]
-        
-        for col in check_cols:
-            # Simuliere König auf diesem Feld
-            original = self.bd.squares[king_row, col]
-            self.bd.squares[king_row, king_col] = None
-            self.bd.squares[king_row, col] = king
-            
-            in_check = self.is_in_check(color)
-            
-            # Zurücksetzen
-            self.bd.squares[king_row, king_col] = king
-            self.bd.squares[king_row, col] = original
-            
-            if in_check:
-                return False
-        
-        return True
 
-    def delete_piece(self, piece):
-        """Entfernt eine Figur aus dem Spiel."""
-        self.bd.remove_piece(piece)
+        if king.moved:
+            return []
+        
+        moves = []
+        king_row = king.position[0]
+        rook1 = self.bd.squares[king_row, 0]
+        rook2 = self.bd.squares[king_row, 7]
+
+        if hasattr(rook1, 'moved') and rook1.moved == False:
+
+            for col in [1, 2, 3]:
+                king_pos = (king_row, col)
+                if self.bd.squares[king_pos] is not None:
+                    break
+                if self.is_in_check(king_pos, self.all_moves):
+                    break
+                king_pos = (king_row, 0)
+                if self.is_in_check(king_pos, self.all_moves):
+                    break
+                moves.append((king_row, 0, None, king,'queenside', rook1))
+
+        if hasattr(rook2, 'moved') and rook2.moved == False:
+
+            for col in [5, 6]:
+                king_pos = (king_row, col)
+                if self.bd.squares[king_pos] is not None:
+                    break
+                if self.is_in_check(king_pos, self.all_moves):
+                    break
+                king_pos = (king_row, 7)
+                if self.is_in_check(king_pos, self.all_moves):
+                    break
+                moves.append((king_row, 7, None, king,'kingside', rook2))
+        return moves
+        
 
 
 
