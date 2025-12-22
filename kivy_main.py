@@ -287,6 +287,107 @@ class ChessBoard(GridLayout):
                         self.squares[(r, c)].add_highlight_dot()
 
 
+class GameOverPopup(Popup):
+    """Popup für Spielende (Checkmate oder Remis)."""
+    def __init__(self, result_type, winner=None, controller=None, **kwargs):
+        """
+        Args:
+            result_type: 'checkmate' oder 'stalemate'
+            winner: 'white' oder 'black' (nur bei checkmate)
+            controller: GameController für Navigation
+        """
+        super().__init__(**kwargs)
+        self.controller = controller
+        
+        self.size_hint = (0.6, 0.5)
+        self.auto_dismiss = False
+        
+        # Layout
+        layout = BoxLayout(orientation='vertical', spacing=20, padding=30)
+        
+        # Titel und Nachricht basierend auf Ergebnis
+        if result_type == 'checkmate':
+            self.title = 'Schachmatt!'
+            winner_text = 'Weiß' if winner == 'white' else 'Schwarz'
+            message = f'{winner_text} gewinnt!'
+            title_color = (0.9, 0.7, 0.2, 1)  # Gold
+        else:  # stalemate
+            self.title = 'Remis!'
+            message = 'Patt - Unentschieden!'
+            title_color = (0.6, 0.6, 0.6, 1)  # Grau
+        
+        # Nachricht
+        message_label = Label(
+            text=message,
+            size_hint=(1, 0.3),
+            font_size='32sp',
+            bold=True,
+            color=title_color
+        )
+        layout.add_widget(message_label)
+        
+        # Button-Container
+        button_container = BoxLayout(
+            orientation='vertical',
+            spacing=15,
+            size_hint=(1, 0.7)
+        )
+        
+        # Neues Spiel Button
+        new_game_btn = Button(
+            text='Neues Spiel',
+            font_size='24sp',
+            background_color=(0.2, 0.7, 0.3, 1),
+            bold=True,
+            size_hint=(1, 0.33)
+        )
+        new_game_btn.bind(on_press=self.new_game)
+        button_container.add_widget(new_game_btn)
+        
+        # Hauptmenü Button
+        menu_btn = Button(
+            text='Hauptmenü',
+            font_size='24sp',
+            background_color=(0.3, 0.4, 0.7, 1),
+            bold=True,
+            size_hint=(1, 0.33)
+        )
+        menu_btn.bind(on_press=self.go_to_menu)
+        button_container.add_widget(menu_btn)
+        
+        # Beenden Button
+        quit_btn = Button(
+            text='Beenden',
+            font_size='24sp',
+            background_color=(0.7, 0.2, 0.2, 1),
+            bold=True,
+            size_hint=(1, 0.33)
+        )
+        quit_btn.bind(on_press=self.quit_app)
+        button_container.add_widget(quit_btn)
+        
+        layout.add_widget(button_container)
+        self.content = layout
+    
+    def new_game(self, instance):
+        """Startet neues Spiel."""
+        self.dismiss()
+        if self.controller:
+            self.controller.restart_game()
+    
+    def go_to_menu(self, instance):
+        """Geht zum Hauptmenü."""
+        self.dismiss()
+        if self.controller:
+            self.controller.go_to_menu()
+    
+    def quit_app(self, instance):
+        """Beendet die App."""
+        self.dismiss()
+        if self.controller:
+            self.controller.quit_app()
+
+
 class PromotionPopup(Popup):
     """Popup für Bauern-Promotion (Wahl zwischen Q, R, B, N)."""
     def __init__(self, color, callback, **kwargs):
@@ -299,7 +400,9 @@ class PromotionPopup(Popup):
         self.callback = callback
         self.color = color
         
-        self.title = 'Bauer befördern zu...'
+        # Titel basierend auf Farbe
+        color_text = 'Weißer' if color == 'white' else 'Schwarzer'
+        self.title = f'Bauern-Beförderung'
         self.size_hint = (0.6, 0.5)
         self.auto_dismiss = False  # Spieler muss wählen
         
@@ -308,9 +411,10 @@ class PromotionPopup(Popup):
         
         # Info-Text
         info_label = Label(
-            text=f'Wähle eine Figur für die Beförderung:',
+            text=f'{color_text} Bauer erreicht die gegnerische Grundlinie!\nWähle eine neue Figur:',
             size_hint=(1, 0.2),
-            font_size='20sp'
+            font_size='20sp',
+            halign='center'
         )
         layout.add_widget(info_label)
         
@@ -407,8 +511,7 @@ class StartMenuScreen(Screen):
         with separator.canvas:
             Color(0.4, 0.4, 0.5, 1)
             self.sep_rect = Rectangle()
-        separator.bind(pos=lambda i, v: setattr(self.sep_rect, 'pos', (i.x + i.width * 0.2, i.y)),
-                       size=lambda i, v: setattr(self.sep_rect, 'size', (i.width * 0.6, 2)))
+        separator.bind(pos=self._update_separator, size=self._update_separator)
         panel.add_widget(separator)
 
         # Button container (three options)
@@ -477,6 +580,11 @@ class StartMenuScreen(Screen):
     def _update_panel(self, instance, value):
         self.panel_rect.pos = instance.pos
         self.panel_rect.size = instance.size
+    
+    def _update_separator(self, instance, value):
+        """Aktualisiert Separator Position und Größe."""
+        self.sep_rect.pos = (instance.x + instance.width * 0.2, instance.y)
+        self.sep_rect.size = (instance.width * 0.6, 2)
 
     def update_bg(self, *args):
         self.bg_rect.pos = self.pos
@@ -1020,6 +1128,18 @@ class GameScreen(Screen):
             callback: Funktion die mit Figuren-Typ ('Q', 'R', 'B', 'N') aufgerufen wird
         """
         popup = PromotionPopup(color, callback)
+        popup.open()
+    
+    def show_game_over_popup(self, result_type, winner, controller):
+        """
+        Zeigt Game-Over Popup an.
+        
+        Args:
+            result_type: 'checkmate' oder 'stalemate'
+            winner: 'white' oder 'black' (nur bei checkmate)
+            controller: GameController für Navigation
+        """
+        popup = GameOverPopup(result_type, winner, controller)
         popup.open()
 
 

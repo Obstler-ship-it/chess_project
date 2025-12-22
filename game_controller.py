@@ -196,12 +196,15 @@ class GameController:
         
         moves = self.chess_logic.all_legal_moves(self.last_move, self.current_turn)
         # Fallback: Falls all_legal_moves() None zurückgibt, leere Liste verwenden
-        # TODO Remis und checkmate
         if isinstance(moves, str):
             if moves == 'checkmate':
-                raise NotImplementedError('checkmate')
+                # Gewinner ist der ANDERE Spieler (der gerade gezogen hat)
+                winner = 'black' if self.current_turn == 'white' else 'white'
+                self._show_game_over_popup('checkmate', winner)
+                return
             elif moves == 'stalemate':
-                raise NotImplementedError('stalemate')
+                self._show_game_over_popup('stalemate')
+                return
             else:
                 raise NotImplementedError('undefined')
         self.valid_moves = moves
@@ -343,6 +346,17 @@ class GameController:
         else:
             # Fallback: Standardmäßig Dame
             callback('Q')
+    
+    def _show_game_over_popup(self, result_type, winner=None):
+        """
+        Zeigt Game-Over Popup an (Checkmate oder Stalemate).
+        
+        Args:
+            result_type: 'checkmate' oder 'stalemate'
+            winner: 'white' oder 'black' (nur bei checkmate)
+        """
+        if self.game_screen:
+            self.game_screen.show_game_over_popup(result_type, winner, self)
     
     def _complete_move(self, move: Move):
         """
