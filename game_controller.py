@@ -15,7 +15,7 @@ Trennung der Verantwortlichkeiten:
 from typing import Optional
 from board import Board
 from pieces import Piece
-from chess_logic import chess_logik
+from chess_logic import chess_logic
 from move import Move
 
 
@@ -53,6 +53,7 @@ class GameController:
         self.checkmate: tuple = None
         self.move_history = []
         self.valid_moves = []  # Alle gültigen Züge für aktuellen Spieler
+        self.legal_moves = [] # Alle legalen Züge für die ausgewähle Figur 
         
         # Spieler-Informationen
         self.white_player = None
@@ -131,7 +132,7 @@ class GameController:
         # Backend initialisieren
         self.board = Board()
         self.board.setup_startpos()  # Explizit aufrufen für neues Spiel
-        self.chess_logic = chess_logik(self.board)
+        self.chess_logic = chess_logic(self.board)
         
         # Spielzustand zurücksetzen
         self.current_turn = 'white'
@@ -139,6 +140,7 @@ class GameController:
         self.last_move = None
         self.checkmate = None
         self.move_history = []
+        self.valid_moves = []
         
         # Berechne initiale legale Züge
         self.valid_moves = self.chess_logic.calculate_all_moves()  # Methode mit () aufrufen!
@@ -185,12 +187,21 @@ class GameController:
     def _update_valid_moves(self):
         """Aktualisiert alle gültigen Züge für aktuellen Spieler."""
         if not self.chess_logic:
+            print('Fehler')
             self.valid_moves = []
             return
         
-        result = self.chess_logic.all_legal_moves(self.last_move, self.current_turn)
+        moves = self.chess_logic.all_legal_moves(self.last_move, self.current_turn)
         # Fallback: Falls all_legal_moves() None zurückgibt, leere Liste verwenden
-        self.valid_moves = result if result is not None else []
+        # TODO Remis und checkmate
+        if isinstance(moves, str):
+            if moves == 'checkmate':
+                raise NotImplementedError('checkmate')
+            elif moves == 'stalemate':
+                raise NotImplementedError('stalemate')
+            else:
+                raise NotImplementedError('undefined')
+        self.valid_moves = moves
     
     def on_square_clicked(self, row, col):
         """
@@ -212,8 +223,8 @@ class GameController:
         # Fall 1: Keine Figur ausgewählt -> Figur auswählen
         if self.selected_piece is None:
             if piece and piece.color == self.current_turn:
-                self._select_piece(piece)
-        
+                self.legal_moves = self._select_piece(piece)
+
         # Fall 2: Figur bereits ausgewählt
         else:
             # Klick auf gleiches Feld -> Auswahl aufheben
@@ -223,17 +234,22 @@ class GameController:
             # Klick auf eigene andere Figur -> andere Figur auswählen
             elif piece and piece.color == self.current_turn:
                 self._deselect_piece()
-                self._select_piece(piece)
+                self.legal_moves = self._select_piece(piece)
             
             else:
-                valid, target = self._is_valid_move(self.selected_piece, (row, col))
-                if valid: # Klick auf legalen Zug -> Zug ausführen
-                    self._execute_move(self.selected_piece, (row, col), target)
-                else:
-                    # Klick auf illegales Feld -> Auswahl aufheben
-                    self._deselect_piece()
+                for move in self.legal_moves:
+                    if (row, col) == move.to_pos:
+                        # Klick auf legalen Zug -> Zug ausführen
+                        self._execute_move(move)
+                    else:
+                        # Klick auf illegales Feld -> Auswahl aufheben
+                        self._deselect_piece()
+        
+            ## Debug TODO
+            for move in self.legal_moves:
+                print(move)
     
-    def _select_piece(self, piece):
+    def _select_piece(self, piece) -> list[Move]:
         """
         Wählt eine Figur aus und zeigt legale Züge.
         
@@ -244,26 +260,23 @@ class GameController:
         
         # Finde legale Positionen für diese Figur aus valid_moves
         legal_positions = []
-        for move_tuple in self.valid_moves:
-            # Flexibles Unpacking: Bauern haben 5 Elemente (mit promotion), Rochade 6, andere 4
-            if len(move_tuple) >= 5:
-                target_row, target_col, captured, move_piece = move_tuple[:4]
-            else:
-                target_row, target_col, captured, move_piece = move_tuple
-            
-            if move_piece == piece:
-                legal_positions.append((target_row, target_col, captured))
+        for move in self.valid_moves:
+            if move.piece == piece:
+                legal_positions.append(move)
         
         # UI aktualisieren: Highlights setzen
         if self.board_widget:
             self.board_widget.clear_highlights()
-            for row, col, captured in legal_positions:
-                if (row, col) in self.board_widget.squares:
+            for move in legal_positions:
+                if move.from_pos in self.board_widget.squares:
                     # Rote Punkte für Schlagzüge, graue für normale Züge
-                    if captured:
-                        self.board_widget.squares[(row, col)].add_highlight_dot('red')
+                    if move.captured:
+                        self.board_widget.squares[move.to_pos].add_highlight_dot('red')
                     else:
-                        self.board_widget.squares[(row, col)].add_highlight_dot('gray')
+                        self.board_widget.squares[move.to_pos].add_highlight_dot('gray')
+        return legal_positions
+        
+
     
     def _deselect_piece(self):
         """Hebt die Auswahl auf und entfernt Highlights."""
@@ -272,28 +285,7 @@ class GameController:
         if self.board_widget:
             self.board_widget.clear_highlights()
     
-    def _is_valid_move(self, piece, target_pos: tuple) -> tuple:
-        """
-        Prüft ob Zug gültig ist (in valid_moves Liste).
-        
-        Args:
-            piece: Figur die bewegt werden soll
-            target_pos: Zielposition (row, col)
-            
-        Returns:
-            True wenn Zug erlaubt
-        """
-        row, col = target_pos
-        for move_tuple in self.valid_moves:
-            target_row, target_col = move_tuple[0:2]
-            captured = move_tuple[2]  # Geschlagene Figur (oder False)
-            move_piece = move_tuple[3]
-
-            if move_piece == piece and (target_row, target_col) == (row, col):
-                return (True, captured)  # Gibt (valid, captured_piece) zurück
-        return (False, False)
-    
-    def _execute_move(self, piece, target_pos: tuple, target: Piece):
+    def _execute_move(self, move: Move):
         """
         Führt einen Zug aus und aktualisiert alles.
         
@@ -301,27 +293,6 @@ class GameController:
             piece: Figur die bewegt wird
             target_pos: Zielposition (row, col)
         """
-        promo = False
-
-        from_row, from_col = piece.position
-        to_row, to_col = target_pos
-
-        if piece.is_pawn:
-            target_row = to_row
-            if (piece.color == 'white' and target_row == 0) or (piece.color == 'black' and target_row == 7):
-                # Füge 4 Promotion-Optionen hinzu
-                for promo_type in ['Q', 'R', 'B', 'N']:
-                    promo = True
-                    raise NotImplementedError("Bauern-Promotion ist noch nicht implementiert.")
-                
-        # Move-Objekt erstellen
-        move = Move(
-            from_pos=(from_row, from_col),
-            to_pos=(to_row, to_col),
-            piece=piece,
-            captured=target,
-            promotion=promo  
-        )
         
         # Zug im Board ausführen
         self.board.make_move(move)

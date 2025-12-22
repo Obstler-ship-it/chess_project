@@ -1,6 +1,7 @@
 """ Enthält die Klassen der Spielfiguren """
 
 from typing import TYPE_CHECKING
+from move import Move
 if TYPE_CHECKING:
     import board as bd
 
@@ -40,7 +41,7 @@ class Piece:
     def __del__(self):
         """ War nur für Debug """
         # Destruktor: Wird aufgerufen, wenn Figur gelöscht wird
-        print(f"{self.notation} - {self.color} piece destroyed")
+        #print(f"{self.notation} - {self.color} piece destroyed")
 
 
 class King(Piece):
@@ -54,12 +55,11 @@ class King(Piece):
         self.checkmate = False
         self.castling_rights = {'kingside': True, 'queenside': True}
 
-    def get_legal_moves(self, board: 'bd.Board') -> list:
+    def get_legal_moves(self, board: 'bd.Board') -> list[Move]:
         """
         Gibt alle legalen Züge des Königs zurück.
         :param board: Board-Objekt mit board.squares als np.array
-        :return: Tuple (legal_moves, blocked_by)
-        legal_moves: Liste von Tupeln (row, col, target(False or piece), self)
+        :return: Liste von Move-Objekten
         """
         legal_moves = []
 
@@ -79,10 +79,10 @@ class King(Piece):
                 target = board.squares[row, col]
 
                 if not target:  # Leeres Feld
-                    legal_moves.append((row, col, False, self))
+                    legal_moves.append(Move(self.position, (row, col), self, None))
 
                 elif target.color != self.color:  # Schlagen möglich
-                    legal_moves.append((row, col, target, self))
+                    legal_moves.append(Move(self.position, (row, col), self, target))
 
         return legal_moves
 
@@ -97,11 +97,11 @@ class Queen(Piece):
     def __init__(self, color: str, position: tuple):
         super().__init__(color, position, notation='Q')
 
-    def get_legal_moves(self, board: 'bd.Board') -> list:
+    def get_legal_moves(self, board: 'bd.Board') -> list[Move]:
         """
         Gibt alle legalen Züge der Dame zurück.
         :param board: 2D np.array mit Figurenobjekten oder None
-        :return: Tuple legal_moves
+        :return: Liste von Move-Objekten
         """
         legal_moves = []
 
@@ -124,10 +124,10 @@ class Queen(Piece):
                 target = board.squares[row, col]
 
                 if target is None:  # Leeres Feld
-                    legal_moves.append((row, col, False, self))
+                    legal_moves.append(Move(self.position, (row, col), self, None))
 
                 elif target.color != self.color:  # Schlagen möglich
-                    legal_moves.append((row, col, target, self))
+                    legal_moves.append(Move(self.position, (row, col), self, target))
                     break
 
                 else:  # Eigene Figur blockiert
@@ -146,11 +146,11 @@ class Rook(Piece):
         super().__init__(color, position, notation='R')
         self.moved = False
 
-    def get_legal_moves(self, board: 'bd.Board') -> list:
+    def get_legal_moves(self, board: 'bd.Board') -> list[Move]:
         """
         Gibt alle legalen Züge des Turms zurück.
         :param board: 2D np.array mit Figurenobjekten oder None
-        :return: Tuple legal_moves
+        :return: Liste von Move-Objekten
         """
         legal_moves = []
 
@@ -170,10 +170,10 @@ class Rook(Piece):
                 target = board.squares[row, col]
 
                 if target is None:  # Leeres Feld
-                    legal_moves.append((row, col, False, self))
+                    legal_moves.append(Move(self.position, (row, col), self, None))
 
                 elif target.color != self.color:  # Schlagen möglich
-                    legal_moves.append((row, col, target, self))
+                    legal_moves.append(Move(self.position, (row, col), self, target))
                     break
 
                 else:  # Eigene Figur blockiert
@@ -191,11 +191,11 @@ class Bishop(Piece):
     def __init__(self, color: str, position: tuple):
         super().__init__(color, position, notation='B')
 
-    def get_legal_moves(self, board: 'bd.Board') -> list:
+    def get_legal_moves(self, board: 'bd.Board') -> list[Move]:
         """
         Gibt alle legalen Züge des Läufers zurück.
         :param board: 2D np.array mit Figurenobjekten oder None
-        :return: Tuple legal_moves
+        :return: Liste von Move-Objekten
         """
         legal_moves = []
 
@@ -216,10 +216,10 @@ class Bishop(Piece):
                 target = board.squares[row, col]
 
                 if target is None:  # Leeres Feld
-                    legal_moves.append((row, col, False, self))
+                    legal_moves.append(Move(self.position, (row, col), self, None))
 
                 elif target.color != self.color:  # Schlagen möglich
-                    legal_moves.append((row, col, target, self))
+                    legal_moves.append(Move(self.position, (row, col), self, target))
                     break
 
                 else:  # Eigene Figur blockiert
@@ -237,11 +237,11 @@ class Knight(Piece):
     def __init__(self, color: str, position: tuple):
         super().__init__(color, position, notation='N')
 
-    def get_legal_moves(self, board: 'bd.Board') -> list:
+    def get_legal_moves(self, board: 'bd.Board') -> list[Move]:
         """
         Gibt alle legalen Züge des Springers zurück.
         :param board: 2D np.array mit Figurenobjekten oder None
-        :return: Tuple legal_move
+        :return: Liste von Move-Objekten
         """
         legal_moves = []
 
@@ -259,10 +259,10 @@ class Knight(Piece):
                 target = board.squares[row, col]
 
                 if target is None:  # Leeres Feld
-                    legal_moves.append((row, col, False, self))
+                    legal_moves.append(Move(self.position, (row, col), self, None))
 
                 elif target.color != self.color:  # Schlagen möglich
-                    legal_moves.append((row, col, target, self))
+                    legal_moves.append(Move(self.position, (row, col), self, target))
 
         return legal_moves
 
@@ -278,11 +278,11 @@ class BlackPawn(Piece):
         self.moved = False
         self.moved_2_once = False
 
-    def get_legal_moves(self, board: 'bd.Board') -> list:
+    def get_legal_moves(self, board: 'bd.Board') -> list[Move]:
         """
         Gibt alle legalen Züge des Bauers zurück.
         :param board: 2D np.array mit Figurenobjekten oder None
-        :return: Tuple legal_moves
+        :return: Liste von Move-Objekten
         """
         legal_moves = []
 
@@ -290,23 +290,23 @@ class BlackPawn(Piece):
 
         if row + 1 < 8:
             if board.squares[row + 1, col] is None: # Ziehen möglich
-                legal_moves.append((row + 1, col, False, self, False))
+                legal_moves.append(Move(self.position, (row + 1, col), self, None))
 
         if 0 <= col -1 and col + 1 < 8:  # En-passant
             for (x, y) in [(row, col + 1), (row, col - 1)]:
                 target = board.squares[x, y]
                 square = board.squares[row + 1 , col]
                 if target is not None and target.is_pawn and target.color != self.color and square is None:
-                    legal_moves.append((x + 1 , y, target, self, True))
+                    legal_moves.append(Move(self.position, (x + 1, y), self, target, en_passant=True))
 
-        if (self.moved is False) and (board.squares[row + 2, col] is None):
-            legal_moves.append((row + 2, col, False, self, False))  # Zwei Felder ziehen möglich
+        if (self.moved is False) and (board.squares[row + 2, col] is None) and (board.squares[row + 1, col] is None):
+            legal_moves.append(Move(self.position, (row + 2, col), self, None))  # Zwei Felder ziehen möglich
 
         for (x, y) in [(row + 1, col +1), (row + 1, col - 1)]:
             if (0 <= x < 8 and 0 <= y < 8):
                 target = board.squares[x, y]
                 if target is not None and target.color != self.color:
-                    legal_moves.append((x, y, target, self, False))  # Schlagen möglich
+                    legal_moves.append(Move(self.position, (x, y), self, target))  # Schlagen möglich
 
         return legal_moves
 
@@ -322,11 +322,11 @@ class WhitePawn(Piece):
         self.moved = False
         self.moved_2_once = False
 
-    def get_legal_moves(self, board: 'bd.Board') -> list:
+    def get_legal_moves(self, board: 'bd.Board') -> list[Move]:
         """
         Gibt alle legalen Züge des Bauers zurück.
         :param board: 2D np.array mit Figurenobjekten oder None
-        :return: Tuple (legal_moves, blocked_by)
+        :return: Liste von Move-Objekten
         """
         legal_moves = []
 
@@ -334,23 +334,23 @@ class WhitePawn(Piece):
 
         if 0 <= row - 1:
             if board.squares[row - 1, col] is None:
-                    legal_moves.append((row - 1, col, False, self, False))  # Ziehen möglich
+                    legal_moves.append(Move(self.position, (row - 1, col), self, None))  # Ziehen möglich
 
         if 0 <= col -1 and col + 1 < 8:  # En-passant
             for (x, y) in [(row, col + 1), (row, col - 1)]:
                 target = board.squares[x, y]
                 square = board.squares[row - 1 , col]
                 if target is not None and target.is_pawn and target.color != self.color and square is None:
-                    legal_moves.append((x - 1 , y, target, self, True))
+                    legal_moves.append(Move(self.position, (x - 1, y), self, target, en_passant=True))
 
-        if (self.moved is False) and (board.squares[row - 2, col] is None):
-            legal_moves.append((row - 2, col, False, self, False))  # Zwei Felder ziehen möglich
+        if (self.moved is False) and (board.squares[row - 2, col] is None) and (board.squares[row - 1, col] is None):
+            legal_moves.append(Move(self.position, (row - 2, col), self, None))  # Zwei Felder ziehen möglich
 
         for (x, y) in [(row - 1, col + 1), (row - 1, col - 1)]:
             if (0 <= x < 8 and 0 <= y < 8):
                 target = board.squares[x, y]
                 if target is not None and target.color != self.color:
-                    legal_moves.append((x, y, target, self, False))  # Schlagen möglich
+                    legal_moves.append(Move(self.position, (x, y), self, target))  # Schlagen möglich
 
         return legal_moves
 

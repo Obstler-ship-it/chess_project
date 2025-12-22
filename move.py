@@ -21,6 +21,7 @@ class Move:
     from_pos: tuple
     to_pos: tuple
     piece: 'Piece'
-    captured: Optional['Piece'] = False
-    promotion: Optional[str] = False #str()
-    # Castling, En-passant etc. können später hinzugefügt werden
+    captured: Optional['Piece'] = None
+    promotion: Optional[str] = None
+    castelling: Optional['Piece'] = None
+    en_passant: bool = False

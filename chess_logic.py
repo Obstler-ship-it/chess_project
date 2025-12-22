@@ -3,7 +3,7 @@ from move import Move
 from pieces import Piece
 from typing import Optional
 
-class chess_logik:
+class chess_logic:
     """ Überprüft auf höchster Ebene die Zulässigkeit von Zügen"""
 
     def __init__(self, bd: Board):
@@ -25,7 +25,7 @@ class chess_logik:
         """ Gibt eine Liste mit allen existierenden Figuren zurück """
         return self.bd.black_pieces
     
-    def calculate_all_moves(self) -> list:
+    def calculate_all_moves(self) -> list[Move]:
         """ Initialisiert alle legal_moves """
 
         self._all_moves = []
@@ -65,19 +65,18 @@ class chess_logik:
             raise ValueError('King not found!')
 
         for move in self.all_moves:
-            piece = move[3]
-            target = move[2]
+            piece = move.piece
 
             if piece.color != curent_turn:
                 continue
                 
             # En-passant prüfen
-            if len(move) == 5 and move[4]:
-                if not self.en_passant(target, last_move):
+            if move.en_passant:
+                if not self.en_passant(move.captured, last_move):
                     continue
 
             # Prüfe ob Zug den eigenen König gefährdet
-            if self.would_leave_king_in_check(move, curent_turn, king):
+            if self.would_leave_king_in_check(move, king):
                 continue
             
             legal_moves.append(move)
@@ -86,19 +85,18 @@ class chess_logik:
         legal_moves.extend(self.castle(king))
     
         # Schachmatt/Stalemate prüfen
-        if legal_moves == []:
-            return [self.check_or_stalemate(king, self.all_moves)]
+        if not legal_moves:
+            return str(self.check_or_stalemate(king, self.all_moves))
 
         return legal_moves
 
-    def en_passant(self, target: Piece, last_move: Move) -> bool:
+    def en_passant(self, captured: Piece, last_move: Move) -> bool:
         """ Zu schlagende Figur muss direkt vorher gezogen haben """
-        if last_move.piece == target:
-            if abs(last_move.from_pos[0] - last_move.to_pos[0]) == 2:
-                return True
+        if last_move.piece == captured:
+            return True
         return False
 
-    def is_in_check(self, king_pos: tuple, all_moves) -> bool:
+    def is_in_check(self, king: Piece, all_moves: list[Move]) -> bool:
         """
         Prüft ob der König im Schach steht.
         
@@ -108,13 +106,12 @@ class chess_logik:
         """
         
         for move in all_moves:
-            target_pos = (move[0], move[1])
-            if target_pos == king_pos:
+            if move.captured == king:
                 return True
         
         return False
     
-    def would_leave_king_in_check(self, move: tuple, color: str, king: Piece) -> bool:
+    def would_leave_king_in_check(self, move: Move, king: Piece) -> bool:
         """
         Simuliert einen Zug und prüft ob der eigene König danach im Schach steht.
         
@@ -125,40 +122,43 @@ class chess_logik:
 
         Board_copy = self.bd.deep_copy()
         legal_moves = []
-        piece = move[3]
-        target = move[2]
 
-        from_row, from_col = piece.position
-        to_row, to_col = move[0:2]
+        from_row, from_col = move.from_pos
 
         # Finde die entsprechende Figur im kopierten Board
         piece_copy = Board_copy.squares[from_row, from_col]
-        target_copy = Board_copy.squares[to_row, to_col] if target else None
+        if move.captured is not None:
+            target_pos = move.captured.position
+            target_copy = Board_copy.squares[target_pos]
+        else:
+            target_copy = None
+
+        king_copy = Board_copy.white_king if king.color == 'white' else Board_copy.black_king
 
          # Move-Objekt erstellen mit kopierten Figuren
         move_obj = Move(
             from_pos=(from_row, from_col),
-            to_pos=(to_row, to_col),
+            to_pos=move.to_pos,
             piece=piece_copy,
             captured=target_copy,
-            promotion=False
+            promotion=move.promotion # TODO hiernochmal schauen
         )
         
         # Zug im Board ausführen
         Board_copy.make_move(move_obj)
-        
-        for piece in Board_copy.white_pieces:
-            get_moves = piece.get_legal_moves(Board_copy)
-            legal_moves.extend(get_moves)
 
-        for piece in Board_copy.black_pieces:
-            get_moves = piece.get_legal_moves(Board_copy)
-            legal_moves.extend(get_moves)
-
-        king_copy = Board_copy.white_king if color == 'white' else Board_copy.black_king
+        if king.color == 'white':
+            for piece in Board_copy.black_pieces:
+                get_moves = piece.get_legal_moves(Board_copy)
+                legal_moves.extend(get_moves)
+        else:
+            for piece in Board_copy.white_pieces:
+                get_moves = piece.get_legal_moves(Board_copy)
+                legal_moves.extend(get_moves)
 
         if self.is_in_check(king_copy.position, legal_moves):
-                 return True
+            print(True) #TODO
+            return True
         return False
 
     def check_or_stalemate(self, king: Piece, all_moves) -> str:
@@ -171,9 +171,9 @@ class chess_logik:
         # Keine legalen Züge verfügbar und König im Schach
         king_pos = king.position
         if self.is_in_check(king_pos, all_moves):
-            return f'checkmate'
+            return 'checkmate'
         else:
-            return f'stalemate'
+            return 'stalemate'
 
     def castle(self, king: Piece) -> list:
         """
@@ -192,31 +192,31 @@ class chess_logik:
         rook1 = self.bd.squares[king_row, 0]
         rook2 = self.bd.squares[king_row, 7]
 
-        if hasattr(rook1, 'moved') and rook1.moved == False:
+        if hasattr(rook1, 'moved') and rook1.moved is False:
 
             for col in [1, 2, 3]:
                 king_pos = (king_row, col)
                 if self.bd.squares[king_pos] is not None:
                     break
-                if self.is_in_check(king_pos, self.all_moves):
+                if self.is_in_check(king, self.all_moves):
                     break
                 king_pos = (king_row, 0)
-                if self.is_in_check(king_pos, self.all_moves):
+                if self.is_in_check(king, self.all_moves):
                     break
-                moves.append((king_row, 0, None, king,'queenside', rook1))
+                moves.append(Move(king.position, (king_row, 2), king, None, castelling=rook1))
 
-        if hasattr(rook2, 'moved') and rook2.moved == False:
+        if hasattr(rook2, 'moved') and rook2.moved is False:
 
             for col in [5, 6]:
                 king_pos = (king_row, col)
                 if self.bd.squares[king_pos] is not None:
                     break
-                if self.is_in_check(king_pos, self.all_moves):
+                if self.is_in_check(king, self.all_moves):
                     break
                 king_pos = (king_row, 7)
-                if self.is_in_check(king_pos, self.all_moves):
+                if self.is_in_check(king, self.all_moves):
                     break
-                moves.append((king_row, 7, None, king,'kingside', rook2))
+                moves.append(Move(king.position, (king_row, 6), king, None, castelling=rook2))
         return moves
         
 
