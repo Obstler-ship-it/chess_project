@@ -72,7 +72,7 @@ class ChessLogic:
                 continue
                 
             # En-passant prüfen
-            if move.en_passant and move.captured:
+            if move.en_passant:
                 if not self.en_passant(move.captured, last_move):
                     continue
 
@@ -115,7 +115,10 @@ class ChessLogic:
         Returns:
             True wenn En passant gültig ist
         """
-        return last_move.piece == captured
+        if last_move.piece == captured:
+            if abs(last_move.from_pos[0] - last_move.to_pos[0]) == 2:
+                return True
+        return False
 
     def is_in_check(self, king: Piece, all_moves: list[Move]) -> bool:
         """Prüft ob der König im Schach steht.
@@ -150,38 +153,41 @@ class ChessLogic:
 
         from_row, from_col = move.from_pos
 
-        # Finde die entsprechende Figur im kopierten Board
-        piece_copy = board_copy.squares[from_row, from_col]
-        target_copy = None
-        if move.captured is not None:
-            target_pos = move.captured.position
-            target_copy = board_copy.squares[target_pos]
+        try:
+            # Finde die entsprechende Figur im kopierten Board
+            piece_copy = board_copy.squares[from_row, from_col]
+            target_copy = None
+            if move.captured is not None:
+                target_pos = move.captured.position
+                target_copy = board_copy.squares[target_pos]
 
-        king_copy = (
-            board_copy.white_king if king.color == 'white'
-            else board_copy.black_king
-        )
+            king_copy = (
+                board_copy.white_king if king.color == 'white'
+                else board_copy.black_king
+            )
 
-        # Move-Objekt erstellen mit kopierten Figuren
-        move_obj = Move(
-            from_pos=(from_row, from_col),
-            to_pos=move.to_pos,
-            piece=piece_copy,
-            captured=target_copy
-        )
-        
-        # Zug im Board ausführen
-        board_copy.make_move(move_obj)
+            # Move-Objekt erstellen mit kopierten Figuren
+            move_obj = Move(
+                from_pos=(from_row, from_col),
+                to_pos=move.to_pos,
+                piece=piece_copy,
+                captured=target_copy
+            )
+            
+            # Zug im Board ausführen
+            board_copy.make_move(move_obj)
 
-        # Berechne gegnerische Züge
-        opponent_pieces = (
-            board_copy.black_pieces if king.color == 'white'
-            else board_copy.white_pieces
-        )
-        for piece in opponent_pieces:
-            legal_moves.extend(piece.get_legal_moves(board_copy))
+            # Berechne gegnerische Züge
+            opponent_pieces = (
+                board_copy.black_pieces if king.color == 'white'
+                else board_copy.white_pieces
+            )
+            for piece in opponent_pieces:
+                legal_moves.extend(piece.get_legal_moves(board_copy))
+        except Exception:
+            raise ValueError('Error simulating move for check detection!')
 
-        if king_copy and self.is_in_check(king_copy, legal_moves):
+        if self.is_in_check(king_copy, legal_moves):
             return True
         return False
 
@@ -210,7 +216,7 @@ class ChessLogic:
             Liste mit möglichen Rochade-Zügen (0-2 Züge)
         """
 
-        if not hasattr(king, 'moved') or king.moved:
+        if king.moved:
             return []
         
         if self.is_in_check(king, self.all_moves):

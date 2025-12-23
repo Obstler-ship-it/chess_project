@@ -281,7 +281,6 @@ class Pawn(Piece):
     def __init__(self, color: str, position: tuple):
         super().__init__(color, position, notation='P', is_pawn=True)
         self.moved = False
-        self.moved_2_once = False
 
     def get_legal_moves(self, board: 'bd.Board') -> list[Move]:
         """Gibt alle legalen Züge des Bauers zurück.

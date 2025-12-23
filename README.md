@@ -11,39 +11,41 @@ Ein voll funktionsfähiges Schachspiel mit grafischer Benutzeroberfläche, entwi
   - Bauernumwandlung (Promotion)
   - Schach, Schachmatt und Patt-Erkennung
 - 🎮 Grafische Benutzeroberfläche (Kivy)
-  - Interaktives Schachbrett
-  - Drag & Drop Unterstützung
+  - Interaktives Schachbrett (Klick-zu-Zug)
   - Visuelle Anzeige legaler Züge
-  - Zughistorie
+  - Zughistorie und Spiel-Replay
+  - Timer-Unterstützung (optional)
 - 💾 Datenbankverwaltung (SQLite)
   - Spielerverwaltung
   - Spielhistorie
   - Statistiken
 - 🏗️ Saubere Architektur
-  - MVC-Pattern
-  - Objektorientiertes Design
-  - Type Hints
-  - PEP 8 konform
+  - Klare Aufteilung: `game_controller.py` (Steuerung) + `ui/` (Kivy-Screens/Widgets) + `board.py`/`chess_logic.py` (Regeln)
+  - Objektorientiertes Design, Type Hints, PEP 8
 
 ## Projektstruktur
 
 ```
 chess_project/
 │
-├── main.py                  # Entry Point der Anwendung
-├── game_controller.py       # Spielsteuerung und Koordination
+├── main.py                  # Python Entry Point
+├── kivy_main.py             # Kivy-App und ScreenManager-Aufbau
+├── game_controller.py       # Spielsteuerung und Navigation
 ├── board.py                 # Schachbrett-Logik
 ├── chess_logic.py           # Regelvalidierung und Zugprüfung
+├── chess_timer.py           # Timer-Handling für Blitz/rapid
 ├── pieces.py                # Spielfiguren (King, Queen, Rook, etc.)
 ├── move.py                  # Move-Datenstruktur
 ├── database.py              # Datenbank-Management
-├── kivy_main.py            # Kivy GUI Implementation
-│
-├── pieces/                  # Figuren-Grafiken (PNG)
+├── ui/
+│   ├── board_widgets.py     # ChessBoard/ChessSquare Widgets
+│   ├── popups.py            # Promotion- & Game-Over-Popups
+│   ├── screens.py           # Start/Game/Stats/Replay/Pause Screens
+│   └── __init__.py
+├── pieces/                  # Figuren-Grafiken (PNG) + KIVY_ARCHITECTURE.md
 ├── tests/                   # Unit Tests
 │   ├── test_board.py
 │   └── test_pieces.py
-│
 ├── requirements.txt         # Python Dependencies
 └── README.md
 ```
@@ -93,14 +95,13 @@ python main.py
 
 ### Spielanleitung
 
-1. **Neues Spiel starten**: Wähle "Neues Spiel" im Hauptmenü
-2. **Spieler auswählen**: Gib Namen für Weiß und Schwarz ein
-3. **Figur bewegen**: 
-   - Klicke auf eine Figur um sie auszuwählen
-   - Legale Züge werden hervorgehoben
-   - Klicke auf ein markiertes Feld um den Zug auszuführen
-4. **Promotion**: Bei Bauernumwandlung erscheint ein Auswahldialog
-5. **Pause**: Über das Menü kann das Spiel pausiert werden
+1. **Neues Spiel**: "Neues Spiel" im Hauptmenü wählen
+2. **Spieler wählen**: Namen für Weiß/Schwarz eingeben; optional Timer aktivieren (Minuten pro Spieler)
+3. **Zug ausführen**:
+  - Figur anklicken → legale Züge werden markiert
+  - Markiertes Zielfeld anklicken, um den Zug auszuführen
+4. **Promotion**: Bei Bauernumwandlung erscheint ein Auswahl-Popup
+5. **Pause/Statistiken**: Über das Menü pausieren oder Rangliste/Spielhistorie öffnen
 
 ## Technische Details
 

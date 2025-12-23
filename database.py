@@ -153,13 +153,14 @@ class DatabaseManager:
         return [dict(row) for row in cursor.fetchall()]
     
     def update_player_stats(self, player_id: int, points_delta: int, 
-                           won: bool = False):
+                           won: bool = False, lost: bool = False):
         """
         Aktualisiert Spieler-Statistiken nach Spielende.
         
         :param player_id: ID des Spielers
-        :param points_delta: Punkteänderung (+3, +1, 0)
+        :param points_delta: Punkteänderung (+3 Sieg, -2 Niederlage, +1 Remis)
         :param won: Ob der Spieler gewonnen hat
+        :param lost: Ob der Spieler verloren hat
         """
         cursor = self.conn.cursor()
         cursor.execute('''
@@ -220,14 +221,14 @@ class DatabaseManager:
         
         # Punkte vergeben
         if result == 'white_win':
-            self.update_player_stats(white_id, 3, won=True)
-            self.update_player_stats(black_id, 0)
+            self.update_player_stats(white_id, 3, won=True)  # Gewinner: +3
+            self.update_player_stats(black_id, -2, lost=True)  # Verlierer: -2
         elif result == 'black_win':
-            self.update_player_stats(black_id, 3, won=True)
-            self.update_player_stats(white_id, 0)
+            self.update_player_stats(black_id, 3, won=True)  # Gewinner: +3
+            self.update_player_stats(white_id, -2, lost=True)  # Verlierer: -2
         else:  # draw
-            self.update_player_stats(white_id, 1)
-            self.update_player_stats(black_id, 1)
+            self.update_player_stats(white_id, 1)  # Remis: +1
+            self.update_player_stats(black_id, 1)  # Remis: +1
         
         self.conn.commit()
     
@@ -299,6 +300,15 @@ class DatabaseManager:
             ORDER BY move_number
         ''', (game_id,))
         return [dict(row) for row in cursor.fetchall()]
+    
+    def get_moves(self, game_id: int) -> List[dict]:
+        """
+        Alias für get_game_moves. Holt alle Züge eines Spiels.
+        
+        :param game_id: ID des Spiels
+        :return: Liste von Dicts mit Zugdaten
+        """
+        return self.get_game_moves(game_id)
     
     # ==================== REMIS-ANGEBOTE ====================
     

@@ -17,6 +17,8 @@ from board import Board
 from pieces import Piece
 from chess_logic import ChessLogic
 from move import Move
+from chess_timer import ChessTimer
+from database import DatabaseManager
 
 
 class GameController:
@@ -44,11 +46,16 @@ class GameController:
         self.current_screen = 'menu'  # Aktueller Screen
         self.app = app
         
+        # Datenbank
+        self.db = DatabaseManager()
+        self.current_game_id = None
+        
         # Spielzustand (nur während aktiven Spiels)
         self.board = None
         self.chess_logic = None
         self.current_turn = None
         self.selected_piece = None
+        self.game_is_over = False
         self.last_move: Optional[Move] = None
         self.checkmate: Optional[tuple] = None
         self.move_history = []
@@ -61,6 +68,9 @@ class GameController:
         self.black_player = None
         self.use_timer = False
         self.time_per_player = None
+        
+        # Timer
+        self.timer = None
         
         # UI-Referenzen (werden von Screens gesetzt)
         self.board_widget = None
@@ -82,9 +92,15 @@ class GameController:
         """Navigiert zum Spiel-Screen."""
         self.current_screen = 'game'
         self.screen_manager.current = 'game'
+        # Timer fortsetzen, falls pausiert
+        if self.timer and self.timer.is_paused:
+            self.timer.resume()
     
     def go_to_pause_menu(self):
         """Navigiert zum Pause-Menü."""
+        # Timer pausieren
+        if self.timer:
+            self.timer.pause()
         self.current_screen = 'pause'
         self.screen_manager.current = 'pause'
     
@@ -103,9 +119,58 @@ class GameController:
         self.current_screen = 'game_history'
         self.screen_manager.current = 'game_history'
     
+    def go_to_game_replay(self):
+        """Navigiert zum Game Replay Screen."""
+        self.current_screen = 'game_replay'
+        self.screen_manager.current = 'game_replay'
+    
     def quit_app(self):
         """Beendet die App."""
         self.app.stop()
+    
+    # ==================== Error Handling ====================
+    
+    def _handle_game_error(self, error: Exception, context: str = ""):
+        """
+        Zentrale Error-Handler-Methode.
+        
+        Bei einem Fehler:
+        1. Spiel zurücksetzen
+        2. Zum Hauptmenü navigieren
+        3. Optional: Fehlermeldung anzeigen
+        
+        Args:
+            error: Die aufgetretene Exception
+            context: Optionale Beschreibung wo der Fehler auftrat
+        """
+        print(f"❌ Fehler im Spiel {context}: {type(error).__name__}: {error}")
+        
+        # Timer stoppen falls aktiv
+        if self.timer:
+            try:
+                self.timer.stop()
+            except:
+                pass
+        
+        # Spiel zurücksetzen
+        self.board = None
+        self.chess_logic = None
+        self.current_turn = None
+        self.selected_piece = None
+        self.game_is_over = False
+        self.last_move = None
+        self.checkmate = None
+        self.move_history = []
+        self.valid_moves = []
+        self.legal_moves = []
+        self.pending_promotion_move = None
+        self.current_game_id = None
+        
+        # Zurück zum Hauptmenü
+        self.go_to_menu()
+        
+        # Optional: Fehlermeldung im UI anzeigen
+        # TODO: Popup mit Fehlermeldung implementieren
     
     # ==================== Spiel-Management ====================
     
@@ -130,31 +195,61 @@ class GameController:
         
         Erstellt Board und chess_logic erst HIER, nicht im __init__!
         """
-        # Backend initialisieren
-        self.board = Board()
-        self.board.setup_startpos()  # Explizit aufrufen für neues Spiel
-        self.chess_logic = ChessLogic(self.board)
-        
-        # Spielzustand zurücksetzen
-        self.current_turn = 'white'
-        self.selected_piece = None
-        self.last_move = None
-        self.checkmate = None
-        self.move_history = []
-        self.valid_moves = []
-        
-        # Berechne initiale legale Züge
-        self.valid_moves = self.chess_logic.calculate_all_moves()  # Methode mit () aufrufen!
-        
-        # UI aktualisieren
-        if self.board_widget:
-            self.board_widget.set_board(self.board)
-            self.board_widget.update_board(self.board.squares, self.checkmate)
-            self.board_widget.clear_highlights()
-        
-        if self.game_screen:
-            self.game_screen.update_turn_info(self.current_turn)
-            self.game_screen.update_move_history([])
+        try:
+            # Backend initialisieren
+            self.board = Board()
+            self.board.setup_startpos()  # Explizit aufrufen für neues Spiel
+            self.chess_logic = ChessLogic(self.board)
+            
+            # Spielzustand zurücksetzen
+            self.current_turn = 'white'
+            self.selected_piece = None
+            self.last_move = None
+            self.checkmate = None
+            self.game_is_over = False
+            self.move_history = []
+            self.valid_moves = []
+            
+            # Berechne initiale legale Züge
+            self.valid_moves = self.chess_logic.calculate_all_moves()  # Methode mit () aufrufen!
+            
+            # Spiel in Datenbank erstellen
+            self._create_game_in_database()
+            
+            # Timer initialisieren (falls aktiviert)
+            if self.use_timer and self.time_per_player:
+                self.timer = ChessTimer(
+                    time_per_player_minutes=self.time_per_player,
+                    on_time_up_callback=self._on_timer_expired
+                )
+                # Setze UI-Update Callback
+                if self.game_screen:
+                    self.timer.on_timer_update = self.game_screen.update_timer_display
+                # Starte Timer
+                self.timer.start()
+            else:
+                self.timer = None
+            
+            # UI aktualisieren
+            if self.board_widget:
+                self.board_widget.set_board(self.board)
+                self.board_widget.update_board(self.board.squares, self.checkmate)
+                self.board_widget.clear_highlights()
+            
+            if self.game_screen:
+                # Spieler-Informationen an GameScreen weitergeben
+                self.game_screen.set_players(self.white_player, self.black_player, self.use_timer, self.time_per_player)
+                self.game_screen.update_turn_info(self.current_turn)
+                self.game_screen.update_move_history([])
+                # Initiale Timer-Anzeige aktualisieren
+                if self.timer:
+                    self.game_screen.update_timer_display(
+                        self.timer.white_time,
+                        self.timer.black_time,
+                        self.timer.current_player
+                    )
+        except Exception as e:
+            self._handle_game_error(e, "beim Spielstart")
     
     def restart_game(self):
         """Startet aktuelles Spiel neu (behält Spieler)."""
@@ -189,32 +284,26 @@ class GameController:
         """Aktualisiert alle gültigen Züge für aktuellen Spieler."""
 
         if not self.chess_logic:
-            print('Fehler')
-            self.valid_moves = []
-            self.checkmate = None
-            return
+            raise ValueError('ChessLogic ist nicht initialisiert!')
         
-        moves = self.chess_logic.all_legal_moves(self.last_move, self.current_turn)
-        # Fallback: Falls all_legal_moves() None zurückgibt, leere Liste verwenden
-        if isinstance(moves, str):
-            if moves == 'checkmate':
-                # Gewinner ist der ANDERE Spieler (der gerade gezogen hat)
-                winner = 'black' if self.current_turn == 'white' else 'white'
-                self._show_game_over_popup('checkmate', winner)
-                return
-            elif moves == 'stalemate':
-                self._show_game_over_popup('stalemate')
-                return
+        try:
+            moves = self.chess_logic.all_legal_moves(self.last_move, self.current_turn)
+            # Fallback: Falls all_legal_moves() None zurückgibt, leere Liste verwenden
+            if isinstance(moves, str):
+                # Spielende (Checkmate oder Stalemate)
+                self.game_over(moves, 'black' if self.current_turn == 'white' else 'white')
+                self.valid_moves = []
             else:
-                raise NotImplementedError('undefined')
-        self.valid_moves = moves
-        
-        # Prüfe ob der aktuelle König im Schach steht
-        king = self.board.white_king if self.current_turn == 'white' else self.board.black_king
-        if king and self.chess_logic.is_in_check(king, self.chess_logic.all_moves):
-            self.checkmate = king.position
-        else:
-            self.checkmate = None
+                self.valid_moves = moves
+            
+            # Prüfe ob der aktuelle König im Schach steht
+            king = self.board.white_king if self.current_turn == 'white' else self.board.black_king
+            if king and self.chess_logic.is_in_check(king, self.chess_logic.all_moves):
+                self.checkmate = king.position
+            else:
+                self.checkmate = None
+        except Exception as e:
+            self._handle_game_error(e, "bei der Berechnung gültiger Züge")
     
     def on_square_clicked(self, row, col):
         """
@@ -228,40 +317,46 @@ class GameController:
             row: Zeile (0-7)
             col: Spalte (0-7)
         """
-        if not self.board:
-            return
-        
-        piece = self.board.squares[row, col]
-        
-        # Fall 1: Keine Figur ausgewählt -> Figur auswählen
-        if self.selected_piece is None:
-            if piece and piece.color == self.current_turn:
-                self.legal_moves = self._select_piece(piece)
+        try:
+            if not self.board:
+                return
+            
+            if self.game_is_over:
+                return  # Kein Zug mehr möglich nach Spielende
+            
+            piece = self.board.squares[row, col]
+            
+            # Fall 1: Keine Figur ausgewählt -> Figur auswählen
+            if self.selected_piece is None:
+                if piece and piece.color == self.current_turn:
+                    self.legal_moves = self._select_piece(piece)
 
-        # Fall 2: Figur bereits ausgewählt
-        else:
-            # Klick auf gleiches Feld -> Auswahl aufheben
-            if piece == self.selected_piece:
-                self._deselect_piece()
-            
-            # Klick auf eigene andere Figur -> andere Figur auswählen
-            elif piece and piece.color == self.current_turn:
-                self._deselect_piece()
-                self.legal_moves = self._select_piece(piece)
-            
-            # Klick auf ein anderes Feld -> prüfe ob legaler Zug
+            # Fall 2: Figur bereits ausgewählt
             else:
-                move_executed = False
-                for move in self.legal_moves:
-                    if (row, col) == move.to_pos:
-                        # Klick auf legalen Zug -> Zug ausführen
-                        self._execute_move(move)
-                        move_executed = True
-                        break
-                
-                # Wenn kein legaler Zug -> Auswahl aufheben
-                if not move_executed:
+                # Klick auf gleiches Feld -> Auswahl aufheben
+                if piece == self.selected_piece:
                     self._deselect_piece()
+                
+                # Klick auf eigene andere Figur -> andere Figur auswählen
+                elif piece and piece.color == self.current_turn:
+                    self._deselect_piece()
+                    self.legal_moves = self._select_piece(piece)
+                
+                # Klick auf ein anderes Feld -> prüfe ob legaler Zug
+                else:
+                    move_executed = False
+                    for move in self.legal_moves:
+                        if (row, col) == move.to_pos:
+                            # Klick auf legalen Zug -> Zug ausführen
+                            self._execute_move(move)
+                            move_executed = True
+                            break
+                    
+                    # Wenn kein legaler Zug -> Auswahl aufheben
+                    if not move_executed:
+                        self._deselect_piece()
+        except Exception as e:
+            self._handle_game_error(e, "bei der Spielfeld-Interaktion")
     
     def _select_piece(self, piece) -> list[Move]:
         """
@@ -310,14 +405,17 @@ class GameController:
         Args:
             move: Move-Objekt mit allen Zug-Informationen
         """
-        # Prüfe ob Promotion nötig ist
-        if move.promotion is not None:
-            # Speichere Move und öffne Popup
-            self.pending_promotion_move = move
-            self._show_promotion_dialog(self.current_turn, self._on_promotion_selected)
-        else:
-            # Kein Promotion -> direkt ausführen
-            self._complete_move(move)
+        try:
+            # Prüfe ob Promotion nötig ist
+            if move.promotion is not None:
+                # Speichere Move und öffne Popup
+                self.pending_promotion_move = move
+                self._show_promotion_dialog(self.current_turn, self._on_promotion_selected)
+            else:
+                # Kein Promotion -> direkt ausführen
+                self._complete_move(move)
+        except Exception as e:
+            self._handle_game_error(e, "bei der Zugausführung")
     
     def _on_promotion_selected(self, piece_type: str):
         """
@@ -358,6 +456,17 @@ class GameController:
         """
         if self.game_screen:
             self.game_screen.show_game_over_popup(result_type, winner, self)
+
+    def _show_time_up_popup(self, winner=None):
+        """
+        Zeigt Game-Over Popup an wenn Zeit abgelaufen ist.
+        
+        Args:
+            result_type: 'checkmate' oder 'stalemate'
+            winner: 'white' oder 'black' (nur bei checkmate)
+        """
+        if self.game_screen:
+            self.game_screen.show_time_up_popup(winner, self)
     
     def _complete_move(self, move: Move):
         """
@@ -366,42 +475,94 @@ class GameController:
         Args:
             move: Move-Objekt mit allen Zug-Informationen
         """
-        # Zug im Board ausführen
-        self.board.make_move(move)
+        try:
+            # Zug im Board ausführen
+            self.board.make_move(move)
+            
+            # last_move speichern
+            self.last_move = move
+            
+            # In Historie speichern
+            self.move_history.append(move)
+            
+            # Spieler wechseln
+            self.current_turn = 'black' if self.current_turn == 'white' else 'white'
+            
+            # Gültige Züge für nächsten Spieler berechnen
+            self._update_valid_moves()
+            
+            # Auswahl aufheben
+            self._deselect_piece()
+            
+            # UI aktualisieren
+            if self.board_widget:
+                self.board_widget.update_board(self.board.squares, self.checkmate)
+            
+            # Timer umschalten (falls aktiv)
+            if self.timer:
+                self.timer.switch_player()
+
+            if self.game_screen:
+                self.game_screen.update_turn_info(self.current_turn)
+                self.game_screen.update_move_history(self.move_history)
+        except Exception as e:
+            self._handle_game_error(e, "bei der Zugvervollständigung")
+    
+    # ==================== Timer-Management ====================
+    
+    def _on_timer_expired(self, color):
+        """
+        Callback wenn die Zeit eines Spielers abgelaufen ist.
         
-        # last_move speichern
-        self.last_move = move
+        Args:
+            color: 'white' oder 'black' - wer hat keine Zeit mehr
+        """
+        # Gewinner ist der andere Spieler
+        winner = 'black' if color == 'white' else 'white'
         
-        # In Historie speichern
-        self.move_history.append(move)
-        
-        # Spieler wechseln
-        self.current_turn = 'black' if self.current_turn == 'white' else 'white'
-        
-        # Gültige Züge für nächsten Spieler berechnen
-        self._update_valid_moves()
-        
-        # Auswahl aufheben
-        self._deselect_piece()
-        
-        # UI aktualisieren
-        if self.board_widget:
-            self.board_widget.update_board(self.board.squares, self.checkmate)
-        
-        if self.game_screen:
-            self.game_screen.update_turn_info(self.current_turn)
-            self.game_screen.update_move_history(self.move_history)
-        
-        # TODO: Spiel-Ende prüfen (Checkmate, Stalemate)
+        # Zeige Game-Over Popup
+        self.game_over('timeover', winner)
     
     # ==================== Hilfsmethoden ====================
     
-    # Unicode-Schachsymbole
-    PIECE_SYMBOLS = {
-        'white': {'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘', 'P': '♙'},
-        'black': {'K': '♚', 'Q': '♛', 'R': '♜', 'B': '♝', 'N': '♞', 'P': '♟'}
-    }
-    
+    def game_over(self, result_type, winner=None):
+        """
+        Beendet das Spiel und zeigt Game-Over Popup an.
+        
+        Args:
+            result_type: 'checkmate' oder 'stalemate' oder 'timeover'
+            winner: 'white' oder 'black' (nur bei checkmate/timeover)
+        """
+        # Timer stoppen
+        if self.timer:
+            self.timer.stop()
+            
+
+        self.game_is_over = True
+        self._deselect_piece()
+        
+        # Spielergebnis in Datenbank speichern
+        if result_type == 'checkmate':
+            # Gewinner ist der ANDERE Spieler (der gerade gezogen hat)
+            winner = 'black' if self.current_turn == 'white' else 'white'
+            self._save_game_result(f'{winner}_win')
+            self._show_game_over_popup('checkmate', winner)
+            return
+        elif result_type == 'stalemate':
+            self._save_game_result('Patt')
+            self._show_game_over_popup('draw')
+            return
+        elif result_type == 'draw':
+            self._save_game_result('Remis')
+            self._show_game_over_popup('draw')
+            return
+        elif result_type == 'timeover':
+            self._save_game_result(f'{winner}_win')
+            self._show_time_up_popup(winner)
+            return
+        else:
+            raise NotImplementedError('undefined')
+
     def get_move_notation(self, move: Move) -> str:
         """
         Konvertiert einen Move in Schachnotation (z.B. "e2-e4").
@@ -434,56 +595,199 @@ class GameController:
             notation += '=' + move.promotion.upper()
         
         return notation
+
+    # ==================== Datenbank-Integration ====================
     
-    def get_formatted_move_notation(self, move: Move) -> str:
+    def _create_game_in_database(self):
+        """Erstellt neues Spiel in der Datenbank."""
+        if not self.white_player or not self.black_player:
+            return  # Kein Spiel ohne Spieler
+        
+        # Spieler in Datenbank holen oder erstellen
+        white_username = self.white_player[1] if isinstance(self.white_player, tuple) else self.white_player.get('username')
+        black_username = self.black_player[1] if isinstance(self.black_player, tuple) else self.black_player.get('username')
+        
+        white_player_data = self.db.get_player_by_username(white_username)
+        if not white_player_data:
+            white_player_id = self.db.create_player(white_username)
+        else:
+            white_player_id = white_player_data['id']
+        
+        black_player_data = self.db.get_player_by_username(black_username)
+        if not black_player_data:
+            black_player_id = self.db.create_player(black_username)
+        else:
+            black_player_id = black_player_data['id']
+        
+        # Spiel erstellen
+        game_type = 'timed' if self.use_timer else 'untimed'
+        self.current_game_id = self.db.create_game(
+            white_player_id=white_player_id,
+            black_player_id=black_player_id,
+            game_type=game_type,
+            time_per_player=self.time_per_player
+        )
+    
+    def _save_game_result(self, result):
         """
-        Konvertiert einen Move in formatierte Schachnotation mit Unicode-Symbolen und Farben.
+        Speichert Spielergebnis in Datenbank.
         
         Args:
-            move: Move-Objekt
-        
-        Returns:
-            String mit formatierter Zugnotation (mit Kivy markup)
+            result: 'white_win', 'black_win', oder 'draw'
         """
-        color = move.piece.color
-        # Farben: Weiß = heller, Schwarz = dunkler
-        text_color = 'E8E8FF' if color == 'white' else 'C0C0D0'
+        if not self.current_game_id:
+            return  # Kein Spiel zu speichern
         
-        # Rochade
-        if move.castelling:
-            if move.to_pos[1] == 6:  # Kurze Rochade
-                notation = "O-O"
-            else:  # Lange Rochade
-                notation = "O-O-O"
-            return f"[color={text_color}]{notation}[/color]"
+        # FEN-String der Endstellung (optional)
+        final_position = ""  # TODO: FEN-String implementieren falls gewünscht
         
-        # Unicode-Symbol für Figur
-        symbol = move.piece.notation
-        if symbol in self.PIECE_SYMBOLS[color]:
-            piece_symbol = self.PIECE_SYMBOLS[color][symbol]
-        else:
-            piece_symbol = ''
+        # Spiel beenden und Statistiken aktualisieren
+        self.db.finish_game(self.current_game_id, result, final_position)
+        self.current_game_id = None
+    
+    # ==================== Remis-Funktionalität ====================
+    
+    def request_draw(self):
+        """
+        Wird aufgerufen wenn Remis-Button gedrückt wird.
+        Öffnet Bestätigungs-Popup.
+        """
+        if self.game_is_over:
+            return  # Kein Remis nach Spielende möglich
         
-        # Zielfeld
-        to_row, to_col = move.to_pos
-        to_notation = chr(ord('a') + to_col) + str(8 - to_row)
+        if self.game_screen:
+            self.game_screen.show_draw_confirm_popup()
+    
+    def confirm_draw(self):
+        """
+        Wird aufgerufen wenn Remis im Popup bestätigt wurde.
+        Beendet das Spiel mit Remis-Ergebnis.
+        """
+        if self.game_is_over:
+            return
         
-        # Schlagzug-Symbol
-        if move.captured:
-            capture_symbol = '×'  # Schönes Unicode-Kreuz
-        else:
-            capture_symbol = ''
+        # Spiel als beendet markieren
+        self.game_over('draw', None)
+    
+    # ==================== Öffentliche Datenbank-API für UI ====================
+    
+    def get_or_create_player(self, username: str):
+        """
+        Holt Spieler aus DB oder erstellt ihn, falls nicht vorhanden.
+        Diese Methode wird vom Frontend (PlayerSelectionScreen) aufgerufen.
         
-        # Zusammensetzen
-        notation = f"{piece_symbol}{capture_symbol}{to_notation}"
+        Args:
+            username: Benutzername des Spielers
+            
+        Returns:
+            Dict mit Spielerdaten
+        """
+        player = self.db.get_player_by_username(username)
+        if not player:
+            player_id = self.db.create_player(username)
+            player = self.db.get_player(player_id)
+        return player
+    
+    def get_leaderboard(self, limit: int = 50):
+        """
+        Holt Rangliste aus der Datenbank.
+        Diese Methode wird vom Frontend (LeaderboardScreen) aufgerufen.
         
-        # Promotion
-        if move.promotion:
-            promo_piece = move.promotion.upper()
-            if promo_piece in self.PIECE_SYMBOLS[color]:
-                promo_symbol = self.PIECE_SYMBOLS[color][promo_piece]
-                notation += f"={promo_symbol}"
-            else:
-                notation += f"={promo_piece}"
+        Args:
+            limit: Anzahl der anzuzeigenden Spieler
+            
+        Returns:
+            Liste von Spieler-Dicts
+        """
+        return self.db.get_leaderboard(limit)
+    
+    def get_games_list(self, limit: int = 50):
+        """
+        Holt Spieleliste aus der Datenbank.
+        Diese Methode wird vom Frontend (HistoryScreen) aufgerufen.
         
-        return f"[color={text_color}]{notation}[/color]"
+        Args:
+            limit: Anzahl der anzuzeigenden Spiele
+            
+        Returns:
+            Liste von Spiel-Dicts
+        """
+        return self.db.list_games(limit=limit)
+    
+    def get_player_by_id(self, player_id: int):
+        """
+        Holt Spieler nach ID aus der Datenbank.
+        Diese Methode wird vom Frontend (HistoryScreen) aufgerufen.
+        
+        Args:
+            player_id: ID des Spielers
+            
+        Returns:
+            Dict mit Spielerdaten oder None
+        """
+        return self.db.get_player(player_id)
+    
+    # ==================== Game Replay Funktionalität ====================
+    
+    def view_game_replay(self, game_id: int):
+        """
+        Öffnet das Game Replay für ein bestimmtes Spiel.
+        
+        Args:
+            game_id: ID des Spiels
+        """
+        # Navigiere zum Replay Screen
+        self.go_to_game_replay()
+        
+        # Lade das Spiel im Replay Screen
+        replay_screen = self.screen_manager.get_screen('game_replay')
+        replay_screen.load_game(game_id)
+    
+    def load_game_for_replay(self, game_id: int):
+        """
+        Lädt ein Spiel und seine Züge für das Replay.
+        
+        Args:
+            game_id: ID des Spiels
+            
+        Returns:
+            Tuple (game_data, moves_list) - Spieldaten und Liste der Zugnotationen
+        """
+        game_data = self.db.get_game(game_id)
+        
+        if not game_data:
+            return None, []
+        
+        # Züge aus der Datenbank holen
+        moves = self.db.get_moves(game_id)
+        
+        # Nur die Notationen extrahieren
+        move_notations = [move['notation'] for move in moves]
+        
+        return game_data, move_notations
+    
+    def get_replay_position(self, move_index: int):
+        """
+        Gibt das Board-Array für eine bestimmte Zugposition im Replay zurück.
+        
+        Args:
+            move_index: Index des Zugs (0 = Startposition)
+            
+        Returns:
+            numpy array mit der Board-Position
+        """
+        # Erstelle ein neues Board in Startposition
+        from board import Board
+        replay_board = Board()
+        replay_board.setup_startpos()
+        
+        # Wenn move_index 0 ist, gib Startposition zurück
+        if move_index == 0:
+            return replay_board.squares
+        
+        # Spiele Züge bis zum angegebenen Index nach
+        # TODO: Hier müssten die Züge tatsächlich auf dem Board ausgeführt werden
+        # Das erfordert, dass wir die Züge als Move-Objekte rekonstruieren können
+        # Für jetzt geben wir erstmal die Startposition zurück
+        
+        return replay_board.squares
