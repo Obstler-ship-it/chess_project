@@ -1,5 +1,9 @@
 """App-Entry mit ScreenManager-Konfiguration."""
 
+# Kivy Config MUSS vor anderen Kivy-Imports stehen
+from kivy.config import Config
+Config.set('input', 'mouse', 'mouse,multitouch_on_demand')
+
 from kivy.app import App
 from kivy.core.window import Window
 from kivy.uix.screenmanager import ScreenManager

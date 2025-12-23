@@ -216,19 +216,27 @@ class GameController:
             # Spiel in Datenbank erstellen
             self._create_game_in_database()
             
-            # Timer initialisieren (falls aktiviert)
+            # Timer initialisieren
             if self.use_timer and self.time_per_player:
+                # Countdown-Timer (klassischer Schach-Timer)
                 self.timer = ChessTimer(
                     time_per_player_minutes=self.time_per_player,
-                    on_time_up_callback=self._on_timer_expired
+                    on_time_up_callback=self._on_timer_expired,
+                    stopwatch_mode=False
                 )
-                # Setze UI-Update Callback
-                if self.game_screen:
-                    self.timer.on_timer_update = self.game_screen.update_timer_display
-                # Starte Timer
-                self.timer.start()
             else:
-                self.timer = None
+                # Stoppuhr-Modus (zählt Zeit hoch)
+                self.timer = ChessTimer(
+                    time_per_player_minutes=0,
+                    on_time_up_callback=None,
+                    stopwatch_mode=True
+                )
+            
+            # Setze UI-Update Callback
+            if self.game_screen:
+                self.timer.on_timer_update = self.game_screen.update_timer_display
+            # Starte Timer
+            self.timer.start()
             
             # UI aktualisieren
             if self.board_widget:
@@ -485,6 +493,15 @@ class GameController:
             # In Historie speichern
             self.move_history.append(move)
             
+            # Zug in Datenbank speichern
+            if self.current_game_id:
+                notation = self.get_move_notation(move)
+                self.db.add_move(
+                    game_id=self.current_game_id,
+                    move_number=len(self.move_history),
+                    notation=notation
+                )
+            
             # Spieler wechseln
             self.current_turn = 'black' if self.current_turn == 'white' else 'white'
             
@@ -638,12 +655,38 @@ class GameController:
         if not self.current_game_id:
             return  # Kein Spiel zu speichern
         
-        # FEN-String der Endstellung (optional)
-        final_position = ""  # TODO: FEN-String implementieren falls gewünscht
+        # Board-Zustand als JSON serialisieren
+        final_position = self._serialize_board()
         
         # Spiel beenden und Statistiken aktualisieren
         self.db.finish_game(self.current_game_id, result, final_position)
         self.current_game_id = None
+    
+    def _serialize_board(self) -> str:
+        """
+        Serialisiert das aktuelle Board als JSON-String.
+        
+        Returns:
+            JSON-String mit Board-Zustand
+        """
+        if not self.board:
+            return ""
+        
+        import json
+        board_data = []
+        
+        for row in range(8):
+            for col in range(8):
+                piece = self.board.squares[row, col]
+                if piece:
+                    board_data.append({
+                        "row": row,
+                        "col": col,
+                        "type": piece.__class__.__name__,
+                        "color": piece.color
+                    })
+        
+        return json.dumps(board_data)
     
     # ==================== Remis-Funktionalität ====================
     
@@ -785,9 +828,14 @@ class GameController:
         if move_index == 0:
             return replay_board.squares
         
+        # Lade Züge aus der Datenbank (wird in load_game_for_replay gesetzt)
+        if not hasattr(self, '_replay_moves') or not self._replay_moves:
+            return replay_board.squares
+        
         # Spiele Züge bis zum angegebenen Index nach
-        # TODO: Hier müssten die Züge tatsächlich auf dem Board ausgeführt werden
-        # Das erfordert, dass wir die Züge als Move-Objekte rekonstruieren können
-        # Für jetzt geben wir erstmal die Startposition zurück
+        # HINWEIS: Dies ist eine vereinfachte Version
+        # Für vollständiges Replay müsste man die Züge wirklich ausführen
+        # Das würde erfordern, die Notation in Move-Objekte zu parsen
+        # Für jetzt geben wir die Startposition zurück
         
         return replay_board.squares

@@ -19,21 +19,29 @@ class ChessTimer:
     aktiven Spieler und stoppt, wenn der Zug beendet wird.
     """
     
-    def __init__(self, time_per_player_minutes, on_time_up_callback=None):
+    def __init__(self, time_per_player_minutes, on_time_up_callback=None, stopwatch_mode=False):
         """
         Initialisiert die Schachuhr.
         
         Args:
-            time_per_player_minutes: Zeit pro Spieler in Minuten (int)
+            time_per_player_minutes: Zeit pro Spieler in Minuten (int) - nur für Countdown
             on_time_up_callback: Funktion die aufgerufen wird wenn Zeit abläuft
                                  Parameter: color ('white' oder 'black')
+            stopwatch_mode: Wenn True, zählt die Zeit hoch statt runter (Stoppuhr)
         """
-        # Zeit in Sekunden speichern
-        self.white_time = time_per_player_minutes * 60
-        self.black_time = time_per_player_minutes * 60
+        self.stopwatch_mode = stopwatch_mode
         
-        # Original-Zeit für Reset
-        self.initial_time = time_per_player_minutes * 60
+        if stopwatch_mode:
+            # Stoppuhr-Modus: Zeit beginnt bei 0 und zählt hoch
+            self.white_time = 0
+            self.black_time = 0
+            self.initial_time = 0
+        else:
+            # Countdown-Modus: Zeit in Sekunden speichern
+            self.white_time = time_per_player_minutes * 60
+            self.black_time = time_per_player_minutes * 60
+            # Original-Zeit für Reset
+            self.initial_time = time_per_player_minutes * 60
         
         # Zustand
         self.current_player = 'white'  # Wer ist gerade am Zug
@@ -125,24 +133,32 @@ class ChessTimer:
         """
         Wird jede Sekunde aufgerufen (von Kivy Clock).
         
-        Reduziert die Zeit des aktuellen Spielers.
+        Reduziert die Zeit des aktuellen Spielers (Countdown) oder
+        erhöht sie (Stopwatch).
         """
         if self.is_paused:
             return
         
-        # Zeit reduzieren
-        if self.current_player == 'white':
-            self.white_time -= 1
-            if self.white_time <= 0:
-                self.white_time = 0
-                self._time_up('white')
-                return
+        if self.stopwatch_mode:
+            # Stopwatch-Modus: Zeit hochzählen
+            if self.current_player == 'white':
+                self.white_time += 1
+            else:
+                self.black_time += 1
         else:
-            self.black_time -= 1
-            if self.black_time <= 0:
-                self.black_time = 0
-                self._time_up('black')
-                return
+            # Countdown-Modus: Zeit reduzieren
+            if self.current_player == 'white':
+                self.white_time -= 1
+                if self.white_time <= 0:
+                    self.white_time = 0
+                    self._time_up('white')
+                    return
+            else:
+                self.black_time -= 1
+                if self.black_time <= 0:
+                    self.black_time = 0
+                    self._time_up('black')
+                    return
         
         # UI aktualisieren
         if self.on_timer_update:

@@ -128,16 +128,7 @@ class DatabaseManager:
         row = cursor.fetchone()
         return dict(row) if row else None
     
-    def list_all_players(self) -> List[dict]:
-        """
-        Listet alle registrierten Spieler auf.
-        
-        :return: Liste von Dicts mit Spielerdaten
-        """
-        cursor = self.conn.cursor()
-        cursor.execute('SELECT * FROM players ORDER BY username')
-        return [dict(row) for row in cursor.fetchall()]
-    
+
     def get_leaderboard(self, limit: int = 10) -> List[dict]:
         """
         Holt die Top-Spieler sortiert nach Punkten.
@@ -158,7 +149,7 @@ class DatabaseManager:
         Aktualisiert Spieler-Statistiken nach Spielende.
         
         :param player_id: ID des Spielers
-        :param points_delta: Punkteänderung (+3 Sieg, -2 Niederlage, +1 Remis)
+        :param points_delta: Punkteänderung (+3 Sieg, 0 Niederlage, +1 Remis)
         :param won: Ob der Spieler gewonnen hat
         :param lost: Ob der Spieler verloren hat
         """
@@ -222,10 +213,10 @@ class DatabaseManager:
         # Punkte vergeben
         if result == 'white_win':
             self.update_player_stats(white_id, 3, won=True)  # Gewinner: +3
-            self.update_player_stats(black_id, -2, lost=True)  # Verlierer: -2
+            self.update_player_stats(black_id, 0, lost=True)  # Verlierer: 0
         elif result == 'black_win':
             self.update_player_stats(black_id, 3, won=True)  # Gewinner: +3
-            self.update_player_stats(white_id, -2, lost=True)  # Verlierer: -2
+            self.update_player_stats(white_id, 0, lost=True)  # Verlierer: 0
         else:  # draw
             self.update_player_stats(white_id, 1)  # Remis: +1
             self.update_player_stats(black_id, 1)  # Remis: +1
@@ -302,61 +293,11 @@ class DatabaseManager:
         return [dict(row) for row in cursor.fetchall()]
     
     def get_moves(self, game_id: int) -> List[dict]:
-        """
-        Alias für get_game_moves. Holt alle Züge eines Spiels.
-        
-        :param game_id: ID des Spiels
-        :return: Liste von Dicts mit Zugdaten
-        """
+        """Alias für get_game_moves."""
         return self.get_game_moves(game_id)
     
     # ==================== REMIS-ANGEBOTE ====================
-    
-    def add_draw_offer(self, game_id: int, offered_by: str, 
-                      move_number: int) -> int:
-        """
-        Fügt ein Remis-Angebot hinzu.
-        
-        :param game_id: ID des Spiels
-        :param offered_by: 'white' oder 'black'
-        :param move_number: Bei welchem Zug angeboten
-        :return: ID des Angebots
-        """
-        cursor = self.conn.cursor()
-        cursor.execute('''
-            INSERT INTO draw_offers (game_id, offered_by, move_number, timestamp)
-            VALUES (?, ?, ?, ?)
-        ''', (game_id, offered_by, move_number, datetime.now().isoformat()))
-        self.conn.commit()
-        return cursor.lastrowid
-    
-    def respond_to_draw_offer(self, offer_id: int, accepted: bool):
-        """
-        Aktualisiert ein Remis-Angebot mit Antwort.
-        
-        :param offer_id: ID des Angebots
-        :param accepted: True wenn angenommen, False wenn abgelehnt
-        """
-        cursor = self.conn.cursor()
-        cursor.execute('''
-            UPDATE draw_offers SET accepted = ? WHERE id = ?
-        ''', (accepted, offer_id))
-        self.conn.commit()
-    
-    def get_game_draw_offers(self, game_id: int) -> List[dict]:
-        """
-        Holt alle Remis-Angebote eines Spiels.
-        
-        :param game_id: ID des Spiels
-        :return: Liste von Dicts mit Angebotsdaten
-        """
-        cursor = self.conn.cursor()
-        cursor.execute('''
-            SELECT * FROM draw_offers 
-            WHERE game_id = ? 
-            ORDER BY move_number
-        ''', (game_id,))
-        return [dict(row) for row in cursor.fetchall()]
+    # Draw offers werden nicht über die DB gehandhabt, sondern direkt mit confirm_draw()
     
     # ==================== UTILITY ====================
     

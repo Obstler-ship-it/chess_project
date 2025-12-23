@@ -18,7 +18,135 @@ from ui.board_widgets import ChessBoard
 from ui.popups import GameOverPopup, PromotionPopup, RemisConfirmPopup
 
 
-class StartMenuScreen(Screen):
+# ==================== GEMEINSAME HILFSMETHODEN ====================
+
+class ScreenBackgroundMixin:
+    """Mixin für gemeinsame Background-Update Methode."""
+    
+    def update_bg(self, *args):
+        """Aktualisiert das Background-Rectangle."""
+        self.bg_rect.pos = self.pos
+        self.bg_rect.size = self.size
+
+
+class PanelMixin:
+    """Mixin für Panel und Separator Updates."""
+    
+    def _update_panel(self, instance, value):
+        """Aktualisiert das Panel-Rectangle."""
+        self.panel_rect.pos = instance.pos
+        self.panel_rect.size = instance.size
+    
+    def _update_separator(self, instance, value):
+        """Aktualisiert den Separator mit 20% Margin."""
+        margin = instance.width * 0.2
+        self.sep_rect.pos = (instance.x + margin, instance.y)
+        self.sep_rect.size = (instance.width * 0.6, 2)
+
+
+def create_move_history_display(container, moves_list):
+    """
+    Gemeinsame Hilfsfunktion zum Erstellen der Zughistorie-Anzeige.
+    
+    Args:
+        container: BoxLayout Container für die Züge
+        moves_list: Liste von Zugnotationen (Strings)
+    """
+    container.clear_widgets()
+    
+    if not moves_list:
+        empty_label = Label(
+            text="Keine Züge",
+            font_size=dp(18),
+            size_hint_y=None,
+            height=40,
+            color=(0.6, 0.6, 0.7, 1),
+            italic=True
+        )
+        container.add_widget(empty_label)
+        return
+
+    # Gruppiere Züge paarweise (Weiß und Schwarz)
+    move_pairs = []
+    for i in range(0, len(moves_list), 2):
+        white_move = moves_list[i]
+        black_move = moves_list[i + 1] if i + 1 < len(moves_list) else None
+        move_pairs.append((white_move, black_move))
+
+    for move_num, (white_move, black_move) in enumerate(move_pairs, 1):
+        # Container für ein Zugpaar (eine Zeile)
+        move_row = BoxLayout(
+            orientation="horizontal",
+            size_hint_y=None,
+            height=35,
+            spacing=4,
+            padding=[2, 2]
+        )
+
+        # Zugnummer Box
+        num_box = BoxLayout(size_hint_x=0.18, padding=[4, 2])
+        with num_box.canvas.before:
+            Color(0.25, 0.3, 0.4, 0.9)
+            num_rect = Rectangle()
+        num_box.bind(
+            pos=lambda instance, value, r=num_rect: setattr(r, "pos", instance.pos),
+            size=lambda instance, value, r=num_rect: setattr(r, "size", instance.size)
+        )
+        
+        num_label = Label(
+            text=f"{move_num}.",
+            font_size=dp(16),
+            bold=True,
+            color=(0.7, 0.8, 0.95, 1)
+        )
+        num_box.add_widget(num_label)
+        move_row.add_widget(num_box)
+
+        # Weißer Zug Box
+        white_box = BoxLayout(size_hint_x=0.41, padding=[6, 2])
+        with white_box.canvas.before:
+            Color(0.2, 0.25, 0.35, 0.95)
+            white_rect = Rectangle()
+        white_box.bind(
+            pos=lambda instance, value, r=white_rect: setattr(r, "pos", instance.pos),
+            size=lambda instance, value, r=white_rect: setattr(r, "size", instance.size)
+        )
+        
+        white_label = Label(
+            text=white_move,
+            font_size=dp(16),
+            color=(0.95, 0.95, 1, 1),
+            bold=True
+        )
+        white_box.add_widget(white_label)
+        move_row.add_widget(white_box)
+
+        # Schwarzer Zug Box (falls vorhanden)
+        if black_move:
+            black_box = BoxLayout(size_hint_x=0.41, padding=[6, 2])
+            with black_box.canvas.before:
+                Color(0.15, 0.18, 0.25, 0.95)
+                black_rect = Rectangle()
+            black_box.bind(
+                pos=lambda instance, value, r=black_rect: setattr(r, "pos", instance.pos),
+                size=lambda instance, value, r=black_rect: setattr(r, "size", instance.size)
+            )
+            
+            black_label = Label(
+                text=black_move,
+                font_size=dp(16),
+                color=(0.85, 0.85, 0.9, 1)
+            )
+            black_box.add_widget(black_label)
+            move_row.add_widget(black_box)
+        else:
+            # Leere Box wenn nur weißer Zug vorhanden
+            move_row.add_widget(Widget(size_hint_x=0.41))
+
+        container.add_widget(move_row)
+
+
+class StartMenuScreen(ScreenBackgroundMixin, PanelMixin, Screen):
     """Start-Menü mit New Game, Settings, Quit Buttons."""
 
     def __init__(self, controller=None, **kwargs):
@@ -88,21 +216,8 @@ class StartMenuScreen(Screen):
         else:
             App.get_running_app().stop()
 
-    def _update_panel(self, instance, value):
-        self.panel_rect.pos = instance.pos
-        self.panel_rect.size = instance.size
 
-    def _update_separator(self, instance, value):
-        margin = instance.width * 0.2
-        self.sep_rect.pos = (instance.x + margin, instance.y + instance.height / 2 - 1)
-        self.sep_rect.size = (instance.width - 2 * margin, 2)
-
-    def update_bg(self, *args):
-        self.bg_rect.pos = self.pos
-        self.bg_rect.size = self.size
-
-
-class PlayerSelectionScreen(Screen):
+class PlayerSelectionScreen(ScreenBackgroundMixin, PanelMixin, Screen):
     """Screen zur Auswahl/Registrierung beider Spieler."""
 
     def __init__(self, controller=None, **kwargs):
@@ -226,15 +341,6 @@ class PlayerSelectionScreen(Screen):
     def toggle_timer_input(self, checkbox, value):
         self.time_input.disabled = not value
 
-    def _update_panel(self, instance, value):
-        self.panel_rect.pos = instance.pos
-        self.panel_rect.size = instance.size
-
-    def _update_separator(self, instance, value):
-        margin = instance.width * 0.2
-        self.sep_rect.pos = (instance.x + margin, instance.y)
-        self.sep_rect.size = (instance.width * 0.6, 2)
-
     def _update_vsep(self, instance, value):
         margin = instance.height * 0.1
         self.vsep_rect.pos = (instance.x, instance.y + margin)
@@ -244,10 +350,6 @@ class PlayerSelectionScreen(Screen):
         margin = instance.width * 0.1
         self.timer_sep_rect.pos = (instance.x + margin, instance.y)
         self.timer_sep_rect.size = (instance.width * 0.8, instance.height)
-
-    def update_bg(self, *args):
-        self.bg_rect.pos = self.pos
-        self.bg_rect.size = self.size
 
     def _get_or_create_player(self, username: str):
         if self.controller:
@@ -500,12 +602,14 @@ class GameScreen(Screen):
         black_name = black_player[1] if isinstance(black_player, tuple) else black_player.get("username", "Schwarz")
 
         if use_timer and time_per_player:
+            # Countdown-Modus
             minutes = time_per_player
             self.white_timer_label.text = f"{white_name}: {minutes:02d}:00"
             self.black_timer_label.text = f"{black_name}: {minutes:02d}:00"
         else:
-            self.white_timer_label.text = f"{white_name}: --:--"
-            self.black_timer_label.text = f"{black_name}: --:--"
+            # Stopwatch-Modus (beginnt bei 00:00)
+            self.white_timer_label.text = f"{white_name}: 00:00"
+            self.black_timer_label.text = f"{black_name}: 00:00"
 
     def _update_font_sizes(self, instance, size):
         base_size = min(size[0], size[1])
@@ -515,9 +619,6 @@ class GameScreen(Screen):
         self.white_timer_label.font_size = dp(timer_size)
         self.black_timer_label.font_size = dp(timer_size)
 
-        history_size = max(16, min(26, int(20 * multiplier)))
-        self.history_label.font_size = dp(history_size)
-
     def update_turn_info(self, current_turn):
         if current_turn == "white":
             self.info_label.text = "[b][color=FFFFFF]WEISS IST AM ZUG[/color][/b]"
@@ -525,100 +626,10 @@ class GameScreen(Screen):
             self.info_label.text = "[b][color=FFFFFF]SCHWARZ IST AM ZUG[/color][/b]"
 
     def update_move_history(self, move_history):
-        self.history_container.clear_widgets()
-        
-        if not move_history:
-            empty_label = Label(
-                text="Noch keine Züge",
-                font_size=dp(18),
-                size_hint_y=None,
-                height=40,
-                color=(0.6, 0.6, 0.7, 1),
-                italic=True
-            )
-            self.history_container.add_widget(empty_label)
-            return
-
-        # Gruppiere Züge paarweise (Weiß und Schwarz)
-        move_pairs = []
-        for i in range(0, len(move_history), 2):
-            white_move = move_history[i]
-            black_move = move_history[i + 1] if i + 1 < len(move_history) else None
-            move_pairs.append((white_move, black_move))
-
-        for move_num, (white_move, black_move) in enumerate(move_pairs, 1):
-            # Container für ein Zugpaar (eine Zeile)
-            move_row = BoxLayout(
-                orientation="horizontal",
-                size_hint_y=None,
-                height=35,
-                spacing=4,
-                padding=[2, 2]
-            )
-
-            # Zugnummer Box
-            num_box = BoxLayout(size_hint_x=0.18, padding=[4, 2])
-            with num_box.canvas.before:
-                Color(0.25, 0.3, 0.4, 0.9)
-                num_rect = Rectangle()
-            num_box.bind(
-                pos=lambda instance, value, r=num_rect: setattr(r, "pos", instance.pos),
-                size=lambda instance, value, r=num_rect: setattr(r, "size", instance.size)
-            )
-            
-            num_label = Label(
-                text=f"{move_num}.",
-                font_size=dp(16),
-                bold=True,
-                color=(0.7, 0.8, 0.95, 1)
-            )
-            num_box.add_widget(num_label)
-            move_row.add_widget(num_box)
-
-            # Weißer Zug Box
-            white_notation = self.controller.get_move_notation(white_move)
-            white_box = BoxLayout(size_hint_x=0.41, padding=[6, 2])
-            with white_box.canvas.before:
-                Color(0.2, 0.25, 0.35, 0.95)
-                white_rect = Rectangle()
-            white_box.bind(
-                pos=lambda instance, value, r=white_rect: setattr(r, "pos", instance.pos),
-                size=lambda instance, value, r=white_rect: setattr(r, "size", instance.size)
-            )
-            
-            white_label = Label(
-                text=white_notation,
-                font_size=dp(16),
-                color=(0.95, 0.95, 1, 1),
-                bold=True
-            )
-            white_box.add_widget(white_label)
-            move_row.add_widget(white_box)
-
-            # Schwarzer Zug Box (falls vorhanden)
-            if black_move:
-                black_notation = self.controller.get_move_notation(black_move)
-                black_box = BoxLayout(size_hint_x=0.41, padding=[6, 2])
-                with black_box.canvas.before:
-                    Color(0.15, 0.18, 0.25, 0.95)
-                    black_rect = Rectangle()
-                black_box.bind(
-                    pos=lambda instance, value, r=black_rect: setattr(r, "pos", instance.pos),
-                    size=lambda instance, value, r=black_rect: setattr(r, "size", instance.size)
-                )
-                
-                black_label = Label(
-                    text=black_notation,
-                    font_size=dp(16),
-                    color=(0.85, 0.85, 0.9, 1)
-                )
-                black_box.add_widget(black_label)
-                move_row.add_widget(black_box)
-            else:
-                # Leere Box wenn nur weißer Zug vorhanden
-                move_row.add_widget(Widget(size_hint_x=0.41))
-
-            self.history_container.add_widget(move_row)
+        # Konvertiere Move-Objekte zu Notationen
+        move_notations = [self.controller.get_move_notation(move) for move in move_history]
+        # Verwende gemeinsame Hilfsfunktion
+        create_move_history_display(self.history_container, move_notations)
 
     def show_pause_menu(self, instance):
         if self.controller:
@@ -721,6 +732,7 @@ class GameScreen(Screen):
         self.white_timer_label.text = f"{white_name}: {white_minutes:02d}:{white_seconds:02d}"
         self.black_timer_label.text = f"{black_name}: {black_minutes:02d}:{black_seconds:02d}"
 
+        # Aktiver Spieler hervorheben
         if active_player == "white":
             with self.white_timer_label.parent.canvas.before:
                 self.white_timer_label.parent.canvas.before.clear()
@@ -740,20 +752,22 @@ class GameScreen(Screen):
                 Color(0.2, 0.3, 0.2, 1)
                 self.white_timer_bg = Rectangle(pos=self.white_timer_label.parent.pos, size=self.white_timer_label.parent.size)
 
-        if white_time_seconds < 60 and active_player == "white":
-            with self.white_timer_label.parent.canvas.before:
-                self.white_timer_label.parent.canvas.before.clear()
-                Color(0.7, 0.2, 0.2, 1)
-                self.white_timer_bg = Rectangle(pos=self.white_timer_label.parent.pos, size=self.white_timer_label.parent.size)
+        # Nur im Countdown-Modus (use_timer=True) rot färben bei weniger als 60 Sekunden
+        if self.use_timer:
+            if white_time_seconds < 60 and active_player == "white":
+                with self.white_timer_label.parent.canvas.before:
+                    self.white_timer_label.parent.canvas.before.clear()
+                    Color(0.7, 0.2, 0.2, 1)
+                    self.white_timer_bg = Rectangle(pos=self.white_timer_label.parent.pos, size=self.white_timer_label.parent.size)
 
-        if black_time_seconds < 60 and active_player == "black":
-            with self.black_timer_label.parent.canvas.before:
-                self.black_timer_label.parent.canvas.before.clear()
-                Color(0.7, 0.2, 0.2, 1)
-                self.black_timer_bg = Rectangle(pos=self.black_timer_label.parent.pos, size=self.black_timer_label.parent.size)
+            if black_time_seconds < 60 and active_player == "black":
+                with self.black_timer_label.parent.canvas.before:
+                    self.black_timer_label.parent.canvas.before.clear()
+                    Color(0.7, 0.2, 0.2, 1)
+                    self.black_timer_bg = Rectangle(pos=self.black_timer_label.parent.pos, size=self.black_timer_label.parent.size)
 
 
-class StatsMenuScreen(Screen):
+class StatsMenuScreen(ScreenBackgroundMixin, PanelMixin, Screen):
     """Menü für Statistiken und Historie."""
 
     def __init__(self, controller=None, **kwargs):
@@ -780,8 +794,8 @@ class StatsMenuScreen(Screen):
         separator = Widget(size_hint=(1, 0.02))
         with separator.canvas:
             Color(0.4, 0.4, 0.5, 1)
-            self.sep_rect_stats = Rectangle()
-        separator.bind(pos=self._update_separator_stats, size=self._update_separator_stats)
+            self.sep_rect = Rectangle()
+        separator.bind(pos=self._update_separator, size=self._update_separator)
         panel.add_widget(separator)
 
         button_container = BoxLayout(orientation="vertical", spacing=20, size_hint=(1, 0.68), padding=[80, 20, 80, 20])
@@ -820,21 +834,8 @@ class StatsMenuScreen(Screen):
         else:
             self.manager.current = "menu"
 
-    def _update_panel(self, instance, value):
-        self.panel_rect.pos = instance.pos
-        self.panel_rect.size = instance.size
 
-    def _update_separator_stats(self, instance, value):
-        margin = instance.width * 0.2
-        self.sep_rect_stats.pos = (instance.x + margin, instance.y + instance.height / 2 - 1)
-        self.sep_rect_stats.size = (instance.width - 2 * margin, 2)
-
-    def update_bg(self, *args):
-        self.bg_rect.pos = self.pos
-        self.bg_rect.size = self.size
-
-
-class LeaderboardScreen(Screen):
+class LeaderboardScreen(ScreenBackgroundMixin, PanelMixin, Screen):
     """Ranglisten-Anzeige."""
 
     def __init__(self, controller=None, **kwargs):
@@ -891,19 +892,6 @@ class LeaderboardScreen(Screen):
 
         main_layout.add_widget(panel)
         self.add_widget(main_layout)
-
-    def _update_panel(self, instance, value):
-        self.panel_rect.pos = instance.pos
-        self.panel_rect.size = instance.size
-
-    def _update_separator(self, instance, value):
-        margin = instance.width * 0.2
-        self.sep_rect.pos = (instance.x + margin, instance.y)
-        self.sep_rect.size = (instance.width * 0.6, 2)
-
-    def update_bg(self, *args):
-        self.bg_rect.pos = self.pos
-        self.bg_rect.size = self.size
 
     def _update_header_rect(self, instance, value):
         self.header_rect.pos = instance.pos
@@ -974,7 +962,7 @@ class LeaderboardScreen(Screen):
             self.manager.current = "stats_menu"
 
 
-class GameHistoryScreen(Screen):
+class GameHistoryScreen(ScreenBackgroundMixin, PanelMixin, Screen):
     """Spielhistorie-Anzeige."""
 
     def __init__(self, controller=None, **kwargs):
@@ -1017,19 +1005,6 @@ class GameHistoryScreen(Screen):
 
         main_layout.add_widget(panel)
         self.add_widget(main_layout)
-
-    def _update_panel(self, instance, value):
-        self.panel_rect.pos = instance.pos
-        self.panel_rect.size = instance.size
-
-    def _update_separator(self, instance, value):
-        margin = instance.width * 0.2
-        self.sep_rect.pos = (instance.x + margin, instance.y)
-        self.sep_rect.size = (instance.width * 0.6, 2)
-
-    def update_bg(self, *args):
-        self.bg_rect.pos = self.pos
-        self.bg_rect.size = self.size
 
     def on_pre_enter(self):
         self.load_game_history()
@@ -1087,6 +1062,8 @@ class GameHistoryScreen(Screen):
             info_box.add_widget(time_label)
             btn_layout.add_widget(info_box)
 
+            game_btn.add_widget(btn_layout)
+
             game_btn.bind(on_press=lambda btn, g=game: self.view_game(g))
 
             def on_btn_press(instance):
@@ -1111,7 +1088,7 @@ class GameHistoryScreen(Screen):
             self.manager.current = "stats_menu"
 
 
-class GameReplayScreen(Screen):
+class GameReplayScreen(ScreenBackgroundMixin, Screen):
     """Screen zum Durchspielen aufgezeichneter Spiele."""
 
     def __init__(self, controller=None, **kwargs):
@@ -1177,11 +1154,10 @@ class GameReplayScreen(Screen):
 
         scroll = ScrollView(size_hint=(1, 1), do_scroll_x=False)
 
-        self.history_label = Label(text="", font_size=dp(16), size_hint_y=None, halign="left", valign="top", color=(0.85, 0.87, 0.95, 1), padding=[10, 10], markup=True)
-        self.history_label.bind(texture_size=self.history_label.setter("size"))
-        self.history_label.bind(width=lambda instance, value: setattr(instance, "text_size", (value - 20, None)))
+        self.history_container = BoxLayout(orientation="vertical", size_hint_y=None, spacing=3, padding=[5, 5])
+        self.history_container.bind(minimum_height=self.history_container.setter("height"))
 
-        scroll.add_widget(self.history_label)
+        scroll.add_widget(self.history_container)
         history_box.add_widget(scroll)
         right_panel.add_widget(history_box)
 
@@ -1190,19 +1166,19 @@ class GameReplayScreen(Screen):
 
         control_box = BoxLayout(orientation="horizontal", size_hint=(1, 0.1), spacing=10, padding=[100, 0])
 
-        first_btn = Button(text="⏮ Anfang", font_size="18sp", background_color=(0.3, 0.4, 0.7, 1), bold=True)
+        first_btn = Button(text="Anfang", font_size="18sp", background_color=(0.3, 0.4, 0.7, 1), bold=True)
         first_btn.bind(on_press=self.go_to_first)
         control_box.add_widget(first_btn)
 
-        prev_btn = Button(text="◀ Zurück", font_size="18sp", background_color=(0.3, 0.4, 0.7, 1), bold=True)
+        prev_btn = Button(text="Zurueck", font_size="18sp", background_color=(0.3, 0.4, 0.7, 1), bold=True)
         prev_btn.bind(on_press=self.prev_move)
         control_box.add_widget(prev_btn)
 
-        next_btn = Button(text="Vor ▶", font_size="18sp", background_color=(0.3, 0.4, 0.7, 1), bold=True)
+        next_btn = Button(text="Vor", font_size="18sp", background_color=(0.3, 0.4, 0.7, 1), bold=True)
         next_btn.bind(on_press=self.next_move)
         control_box.add_widget(next_btn)
 
-        last_btn = Button(text="Ende ⏭", font_size="18sp", background_color=(0.3, 0.4, 0.7, 1), bold=True)
+        last_btn = Button(text="Ende", font_size="18sp", background_color=(0.3, 0.4, 0.7, 1), bold=True)
         last_btn.bind(on_press=self.go_to_last)
         control_box.add_widget(last_btn)
 
@@ -1222,7 +1198,18 @@ class GameReplayScreen(Screen):
         white_player = self.controller.get_player_by_id(self.game_data["white_player_id"])
         black_player = self.controller.get_player_by_id(self.game_data["black_player_id"])
 
-        self.game_info_label.text = f"[b]{white_player['username']}[/b] vs [b]{black_player['username']}[/b]"
+        # Spielergebnis formatieren
+        result = self.game_data.get("result", "")
+        if result == "white_win":
+            result_text = f"[color=4dcc4d]{white_player['username']} gewonnen[/color]"
+        elif result == "black_win":
+            result_text = f"[color=4dcc4d]{black_player['username']} gewonnen[/color]"
+        elif result == "draw":
+            result_text = "[color=cccc4d]Remis[/color]"
+        else:
+            result_text = "[color=9999aa]Laufend[/color]"
+
+        self.game_info_label.text = f"[b]{white_player['username']}[/b] vs [b]{black_player['username']}[/b]\n{result_text}"
 
         self.current_move_index = 0
         self.show_position()
@@ -1242,24 +1229,8 @@ class GameReplayScreen(Screen):
         self.update_history_display()
 
     def update_history_display(self):
-        if not self.moves:
-            self.history_label.text = "[i]Keine Züge[/i]"
-            return
-
-        text = ""
-        for i, move_notation in enumerate(self.moves):
-            move_num = i + 1
-
-            if i == self.current_move_index - 1:
-                text += f"[b][color=FFD700]→ {move_num}. {move_notation}[/color][/b]\n"
-            else:
-                if move_num % 2 == 1:
-                    text += f"[color=FFFFFF]{move_num}. {move_notation}[/color]\n"
-                else:
-                    text += f"[color=D0D0D8]{move_num}. {move_notation}[/color]\n"
-
-        self.history_label.text = text
-        self.history_label.texture_update()
+        # Verwende gemeinsame Hilfsfunktion (self.moves sind bereits Strings)
+        create_move_history_display(self.history_container, self.moves)
 
     def go_to_first(self, instance):
         self.current_move_index = 0
@@ -1285,10 +1256,6 @@ class GameReplayScreen(Screen):
         else:
             self.manager.current = "game_history"
 
-    def update_bg(self, *args):
-        self.bg_rect.pos = self.pos
-        self.bg_rect.size = self.size
-
     def _update_board_size(self, instance, value):
         if not hasattr(self, "board"):
             return
@@ -1311,7 +1278,7 @@ class GameReplayScreen(Screen):
         self.history_bg.size = instance.size
 
 
-class PauseMenuScreen(Screen):
+class PauseMenuScreen(ScreenBackgroundMixin, PanelMixin, Screen):
     """Pause-Menü mit Resume, Restart, Main Menu."""
 
     def __init__(self, controller=None, **kwargs):
@@ -1365,19 +1332,6 @@ class PauseMenuScreen(Screen):
 
         main_layout.add_widget(panel)
         self.add_widget(main_layout)
-
-    def _update_panel(self, instance, value):
-        self.panel_rect.pos = instance.pos
-        self.panel_rect.size = instance.size
-
-    def _update_separator(self, instance, value):
-        margin = instance.width * 0.2
-        self.sep_rect.pos = (instance.x + margin, instance.y)
-        self.sep_rect.size = (instance.width * 0.6, 2)
-
-    def update_bg(self, *args):
-        self.bg_rect.pos = self.pos
-        self.bg_rect.size = self.size
 
     def resume_game(self, instance):
         if self.controller:

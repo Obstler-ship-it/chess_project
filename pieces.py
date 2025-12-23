@@ -61,7 +61,6 @@ class King(Piece):
         super().__init__(color, position, notation='K')
         self.moved = False  # Für Rochade (O-O) wichtig
         self.checkmate = False
-        self.castling_rights = {'kingside': True, 'queenside': True}
 
     def get_legal_moves(self, board: 'bd.Board') -> list[Move]:
         """
