@@ -497,6 +497,18 @@ class GameController:
             # In Historie speichern
             self.move_history.append(move)
             
+            # Zug sofort in Datenbank speichern (für Datensicherheit)
+            if self.current_game_id:
+                notation = self.get_move_notation(move)
+                white_time, black_time = self._extract_move_times(move)
+                self.db.add_move(
+                    game_id=self.current_game_id,
+                    move_number=len(self.move_history),  # Aktuelle Anzahl Züge
+                    notation=notation,
+                    white_time=white_time,
+                    black_time=black_time
+                )
+            
             # Spieler wechseln
             self.current_turn = 'black' if self.current_turn == 'white' else 'white'
             
@@ -570,24 +582,9 @@ class GameController:
         if winner is None:
             # Gewinner ist der ANDERE Spieler (der gerade gezogen hat)
             winner = 'black' if self.current_turn == 'white' else 'white'
-        
-        # Züge in Datenbank speichern (bevor wir returnen!)
-        for index, move in enumerate(self.move_history):
-            # Zug in Datenbank speichern
-            if self.current_game_id:
-                notation = self.get_move_notation(move)
-                # Zeit-Information aus Move-Objekt extrahieren
-                white_time, black_time = self._extract_move_times(move)
-                
-                self.db.add_move(
-                    game_id=self.current_game_id,
-                    move_number=index + 1,  # Zugnummern beginnen bei 1
-                    notation=notation,
-                    white_time=white_time,
-                    black_time=black_time
-                )
             
         # Spielergebnis in Datenbank speichern
+        # (Züge wurden bereits während des Spiels gespeichert)
         if result_type == 'checkmate':
             self._save_game_result(f'{winner}_win')
             self._show_game_over_popup('checkmate', winner)
