@@ -137,7 +137,6 @@ class GameController:
         Bei einem Fehler:
         1. Spiel zurücksetzen
         2. Zum Hauptmenü navigieren
-        3. Optional: Fehlermeldung anzeigen
         
         Args:
             error: Die aufgetretene Exception
@@ -168,9 +167,7 @@ class GameController:
         
         # Zurück zum Hauptmenü
         self.go_to_menu()
-        
-        # Optional: Fehlermeldung im UI anzeigen
-        # TODO: Popup mit Fehlermeldung implementieren
+
     
     # ==================== Spiel-Management ====================
     
@@ -493,15 +490,6 @@ class GameController:
             # In Historie speichern
             self.move_history.append(move)
             
-            # Zug in Datenbank speichern
-            if self.current_game_id:
-                notation = self.get_move_notation(move)
-                self.db.add_move(
-                    game_id=self.current_game_id,
-                    move_number=len(self.move_history),
-                    notation=notation
-                )
-            
             # Spieler wechseln
             self.current_turn = 'black' if self.current_turn == 'white' else 'white'
             
@@ -515,7 +503,7 @@ class GameController:
             if self.board_widget:
                 self.board_widget.update_board(self.board.squares, self.checkmate)
             
-            # Timer umschalten (falls aktiv)
+            # Timer umschalten
             if self.timer:
                 self.timer.switch_player()
 
@@ -552,16 +540,16 @@ class GameController:
         """
         # Timer stoppen
         if self.timer:
-            self.timer.stop()
-            
+            self.timer.stop()   
 
         self.game_is_over = True
         self._deselect_piece()
         
+        # Gewinner ist der ANDERE Spieler (der gerade gezogen hat)
+        winner = 'black' if self.current_turn == 'white' else 'white'
+            
         # Spielergebnis in Datenbank speichern
         if result_type == 'checkmate':
-            # Gewinner ist der ANDERE Spieler (der gerade gezogen hat)
-            winner = 'black' if self.current_turn == 'white' else 'white'
             self._save_game_result(f'{winner}_win')
             self._show_game_over_popup('checkmate', winner)
             return
@@ -579,6 +567,17 @@ class GameController:
             return
         else:
             raise NotImplementedError('undefined')
+            
+        for index, move in enumerate(self.move_historie):
+            # Zug in Datenbank speichern
+            if self.current_game_id:
+                notation = self.get_move_notation(move)
+                self.db.add_move(
+                    game_id=self.current_game_id,
+                    move_number=index,
+                    move = move,
+                    notation=notation
+                )
 
     def get_move_notation(self, move: Move) -> str:
         """
