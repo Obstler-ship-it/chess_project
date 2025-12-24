@@ -537,6 +537,20 @@ class GameController:
     
     # ==================== Hilfsmethoden ====================
     
+    def _extract_move_times(self, move: Move) -> tuple[Optional[str], Optional[str]]:
+        """
+        Extrahiert Zeit-Informationen aus einem Move-Objekt.
+        
+        Args:
+            move: Move-Objekt
+            
+        Returns:
+            Tuple (white_time, black_time) als Strings oder None
+        """
+        if move.time:
+            return move.time.get('white', None), move.time.get('black', None)
+        return None, None
+    
     def game_over(self, result_type, winner=None):
         """
         Beendet das Spiel und zeigt Game-Over Popup an.
@@ -552,8 +566,10 @@ class GameController:
         self.game_is_over = True
         self._deselect_piece()
         
-        # Gewinner ist der ANDERE Spieler (der gerade gezogen hat)
-        winner = 'black' if self.current_turn == 'white' else 'white'
+        # Gewinner bestimmen, falls nicht übergeben
+        if winner is None:
+            # Gewinner ist der ANDERE Spieler (der gerade gezogen hat)
+            winner = 'black' if self.current_turn == 'white' else 'white'
         
         # Züge in Datenbank speichern (bevor wir returnen!)
         for index, move in enumerate(self.move_history):
@@ -561,8 +577,7 @@ class GameController:
             if self.current_game_id:
                 notation = self.get_move_notation(move)
                 # Zeit-Information aus Move-Objekt extrahieren
-                white_time = move.time.get('white', None) if move.time else None
-                black_time = move.time.get('black', None) if move.time else None
+                white_time, black_time = self._extract_move_times(move)
                 
                 self.db.add_move(
                     game_id=self.current_game_id,
