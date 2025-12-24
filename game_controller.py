@@ -547,6 +547,9 @@ class GameController:
         
         # Gewinner ist der ANDERE Spieler (der gerade gezogen hat)
         winner = 'black' if self.current_turn == 'white' else 'white'
+        
+        # Züge in Datenbank speichern
+        self._save_moves_in_db()
             
         # Spielergebnis in Datenbank speichern
         if result_type == 'checkmate':
@@ -567,17 +570,32 @@ class GameController:
             return
         else:
             raise NotImplementedError('undefined')
-            
-        for index, move in enumerate(self.move_historie):
+
+
+    def _save_moves_in_db(self):
+        """
+        Speichert alle Züge aus move_history in der Datenbank.
+        
+        Verwendet die to_json-Methode der Move-Klasse zur Serialisierung
+        und die get_move_notation-Methode zur Notation-Generierung.
+        """
+        if not self.current_game_id:
+            return  # Kein Spiel zu speichern
+        
+        for index, move in enumerate(self.move_history):
             # Zug in Datenbank speichern
-            if self.current_game_id:
-                notation = self.get_move_notation(move)
-                self.db.add_move(
-                    game_id=self.current_game_id,
-                    move_number=index,
-                    move = move,
-                    notation=notation
-                )
+            notation = self.get_move_notation(move)
+            
+            # Zug-JSON vorbereiten (für zukünftige erweiterte Speicherung)
+            # Das JSON wird durch to_json() erzeugt und ist bereit für die Speicherung,
+            # sobald die Datenbank um ein entsprechendes Feld erweitert wird
+            _ = move.to_json()
+            
+            self.db.add_move(
+                game_id=self.current_game_id,
+                move_number=index + 1,  # Zugnummern beginnen bei 1
+                notation=notation
+            )
 
     def get_move_notation(self, move: Move) -> str:
         """

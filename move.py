@@ -1,5 +1,6 @@
 """Move Datenstruktur für Schachzüge."""
 
+import json
 from dataclasses import dataclass
 from typing import Optional, TYPE_CHECKING
 
@@ -27,3 +28,37 @@ class Move:
     promotion: Optional[str] = None
     castelling: Optional['Piece'] = None
     en_passant: bool = False
+    
+    def to_json(self) -> str:
+        """
+        Serialisiert den Move als JSON-String.
+        
+        Konvertiert alle Attribute des Zugs in ein Dictionary und dann in JSON.
+        Piece-Objekte werden als Dictionary mit Typ und Farbe dargestellt.
+        
+        Returns:
+            JSON-String mit allen Move-Attributen
+        """
+        move_dict = {
+            'from_pos': self.from_pos,
+            'to_pos': self.to_pos,
+            'piece': {
+                'type': self.piece.__class__.__name__,
+                'color': self.piece.color,
+                'notation': self.piece.notation
+            } if self.piece else None,
+            'captured': {
+                'type': self.captured.__class__.__name__,
+                'color': self.captured.color,
+                'notation': self.captured.notation
+            } if self.captured else None,
+            'promotion': self.promotion,
+            'castelling': {
+                'type': self.castelling.__class__.__name__,
+                'color': self.castelling.color,
+                'notation': self.castelling.notation
+            } if self.castelling else None,
+            'en_passant': self.en_passant
+        }
+        
+        return json.dumps(move_dict)
