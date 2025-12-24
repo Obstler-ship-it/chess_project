@@ -19,6 +19,7 @@ class Move:
         promotion: Promotionstyp ('queen', 'rook', 'bishop', 'knight' oder None)
         castelling: Das Turm-Objekt bei Rochade (oder None)
         en_passant: True wenn Zug en-passant ist
+        time: Optional dictionary mit 'white' und 'black' Zeitstrings im Format "MM:SS"
     """
     from_pos: tuple
     to_pos: tuple
@@ -27,3 +28,4 @@ class Move:
     promotion: Optional[str] = None
     castelling: Optional['Piece'] = None
     en_passant: bool = False
+    time: Optional[dict] = None

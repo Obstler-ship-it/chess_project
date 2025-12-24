@@ -18,11 +18,30 @@ class DatabaseManager:
         self.conn = None
         self._connect()
         self._create_tables()
+        self._migrate_database()
     
     def _connect(self):
         """Stellt Verbindung zur Datenbank her."""
         self.conn = sqlite3.connect(self.db_path)
         self.conn.row_factory = sqlite3.Row  # Ermöglicht Zugriff per Spaltenname
+    
+    def _migrate_database(self):
+        """Führt notwendige Datenbank-Migrationen durch."""
+        cursor = self.conn.cursor()
+        
+        # Prüfe ob white_time und black_time Spalten in moves Tabelle existieren
+        cursor.execute("PRAGMA table_info(moves)")
+        columns = [row[1] for row in cursor.fetchall()]
+        
+        # Führe beide Änderungen in einer Transaktion durch
+        if 'white_time' not in columns or 'black_time' not in columns:
+            if 'white_time' not in columns:
+                cursor.execute('ALTER TABLE moves ADD COLUMN white_time TEXT')
+            
+            if 'black_time' not in columns:
+                cursor.execute('ALTER TABLE moves ADD COLUMN black_time TEXT')
+            
+            self.conn.commit()
     
     def _create_tables(self):
         """Erstellt die erforderlichen Tabellen falls sie nicht existieren."""
@@ -65,6 +84,8 @@ class DatabaseManager:
                 move_number INTEGER NOT NULL,
                 notation TEXT NOT NULL,
                 timestamp TEXT NOT NULL,
+                white_time TEXT,
+                black_time TEXT,
                 FOREIGN KEY (game_id) REFERENCES games(id)
             )
         ''')
@@ -262,19 +283,22 @@ class DatabaseManager:
     
     # ==================== ZUG-VERWALTUNG ====================
     
-    def add_move(self, game_id: int, move_number: int, notation: str):
+    def add_move(self, game_id: int, move_number: int, notation: str, 
+                 white_time: Optional[str] = None, black_time: Optional[str] = None):
         """
         Fügt einen Zug zu einem Spiel hinzu.
         
         :param game_id: ID des Spiels
         :param move_number: Zugnummer
         :param notation: Standard-Schachnotation (z.B. 'e4', 'Nf3')
+        :param white_time: Verbleibende Zeit von Weiß als String (z.B. "05:30")
+        :param black_time: Verbleibende Zeit von Schwarz als String (z.B. "04:45")
         """
         cursor = self.conn.cursor()
         cursor.execute('''
-            INSERT INTO moves (game_id, move_number, notation, timestamp)
-            VALUES (?, ?, ?, ?)
-        ''', (game_id, move_number, notation, datetime.now().isoformat()))
+            INSERT INTO moves (game_id, move_number, notation, timestamp, white_time, black_time)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (game_id, move_number, notation, datetime.now().isoformat(), white_time, black_time))
         self.conn.commit()
     
     def get_game_moves(self, game_id: int) -> List[dict]:

@@ -481,6 +481,13 @@ class GameController:
             move: Move-Objekt mit allen Zug-Informationen
         """
         try:
+            # Zeit vor dem Zug speichern (falls Timer existiert)
+            if self.timer:
+                move.time = {
+                    'white': self.timer.get_white_time_string(),
+                    'black': self.timer.get_black_time_string()
+                }
+            
             # Zug im Board ausführen
             self.board.make_move(move)
             
@@ -489,6 +496,18 @@ class GameController:
             
             # In Historie speichern
             self.move_history.append(move)
+            
+            # Zug sofort in Datenbank speichern (zur Datensicherheit)
+            if self.current_game_id:
+                notation = self.get_move_notation(move)
+                white_time, black_time = self._extract_move_times(move)
+                self.db.add_move(
+                    game_id=self.current_game_id,
+                    move_number=len(self.move_history),  # Aktuelle Anzahl Züge
+                    notation=notation,
+                    white_time=white_time,
+                    black_time=black_time
+                )
             
             # Spieler wechseln
             self.current_turn = 'black' if self.current_turn == 'white' else 'white'
@@ -530,6 +549,20 @@ class GameController:
     
     # ==================== Hilfsmethoden ====================
     
+    def _extract_move_times(self, move: Move) -> tuple[Optional[str], Optional[str]]:
+        """
+        Extrahiert Zeit-Informationen aus einem Move-Objekt.
+        
+        Args:
+            move: Move-Objekt
+            
+        Returns:
+            Tuple (white_time, black_time) als Strings oder None
+        """
+        if move.time:
+            return move.time.get('white', None), move.time.get('black', None)
+        return None, None
+    
     def game_over(self, result_type, winner=None):
         """
         Beendet das Spiel und zeigt Game-Over Popup an.
@@ -545,39 +578,27 @@ class GameController:
         self.game_is_over = True
         self._deselect_piece()
         
-        # Gewinner ist der ANDERE Spieler (der gerade gezogen hat)
-        winner = 'black' if self.current_turn == 'white' else 'white'
+        # Gewinner bestimmen, falls nicht übergeben
+        if winner is None:
+            # Gewinner ist der ANDERE Spieler (der gerade gezogen hat)
+            winner = 'black' if self.current_turn == 'white' else 'white'
             
         # Spielergebnis in Datenbank speichern
+        # (Züge wurden bereits während des Spiels gespeichert)
         if result_type == 'checkmate':
             self._save_game_result(f'{winner}_win')
             self._show_game_over_popup('checkmate', winner)
-            return
         elif result_type == 'stalemate':
             self._save_game_result('Patt')
             self._show_game_over_popup('draw')
-            return
         elif result_type == 'draw':
             self._save_game_result('Remis')
             self._show_game_over_popup('draw')
-            return
         elif result_type == 'timeover':
             self._save_game_result(f'{winner}_win')
             self._show_time_up_popup(winner)
-            return
         else:
-            raise NotImplementedError('undefined')
-            
-        for index, move in enumerate(self.move_historie):
-            # Zug in Datenbank speichern
-            if self.current_game_id:
-                notation = self.get_move_notation(move)
-                self.db.add_move(
-                    game_id=self.current_game_id,
-                    move_number=index,
-                    move = move,
-                    notation=notation
-                )
+            raise NotImplementedError(f'Unbekannter result_type: {result_type}')
 
     def get_move_notation(self, move: Move) -> str:
         """
