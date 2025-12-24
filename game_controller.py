@@ -585,8 +585,11 @@ class GameController:
         for index, move in enumerate(self.move_history):
             # Zug in Datenbank speichern
             notation = self.get_move_notation(move)
-            # Zug-JSON für spätere erweiterte Speicherung vorbereiten
-            move_json = move.to_json()
+            
+            # Zug-JSON vorbereiten (für zukünftige erweiterte Speicherung)
+            # Das JSON wird durch to_json() erzeugt und ist bereit für die Speicherung,
+            # sobald die Datenbank um ein entsprechendes Feld erweitert wird
+            _ = move.to_json()
             
             self.db.add_move(
                 game_id=self.current_game_id,
