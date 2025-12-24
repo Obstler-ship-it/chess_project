@@ -481,6 +481,13 @@ class GameController:
             move: Move-Objekt mit allen Zug-Informationen
         """
         try:
+            # Zeit vor dem Zug speichern (falls Timer existiert)
+            if self.timer:
+                move.time = {
+                    'white': self.timer.get_white_time_string(),
+                    'black': self.timer.get_black_time_string()
+                }
+            
             # Zug im Board ausführen
             self.board.make_move(move)
             
@@ -547,6 +554,23 @@ class GameController:
         
         # Gewinner ist der ANDERE Spieler (der gerade gezogen hat)
         winner = 'black' if self.current_turn == 'white' else 'white'
+        
+        # Züge in Datenbank speichern (bevor wir returnen!)
+        for index, move in enumerate(self.move_history):
+            # Zug in Datenbank speichern
+            if self.current_game_id:
+                notation = self.get_move_notation(move)
+                # Zeit-Information aus Move-Objekt extrahieren
+                white_time = move.time.get('white', None) if move.time else None
+                black_time = move.time.get('black', None) if move.time else None
+                
+                self.db.add_move(
+                    game_id=self.current_game_id,
+                    move_number=index + 1,  # Zugnummern beginnen bei 1
+                    notation=notation,
+                    white_time=white_time,
+                    black_time=black_time
+                )
             
         # Spielergebnis in Datenbank speichern
         if result_type == 'checkmate':
@@ -567,17 +591,6 @@ class GameController:
             return
         else:
             raise NotImplementedError('undefined')
-            
-        for index, move in enumerate(self.move_historie):
-            # Zug in Datenbank speichern
-            if self.current_game_id:
-                notation = self.get_move_notation(move)
-                self.db.add_move(
-                    game_id=self.current_game_id,
-                    move_number=index,
-                    move = move,
-                    notation=notation
-                )
 
     def get_move_notation(self, move: Move) -> str:
         """
