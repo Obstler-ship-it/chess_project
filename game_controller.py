@@ -497,7 +497,7 @@ class GameController:
             # In Historie speichern
             self.move_history.append(move)
             
-            # Zug sofort in Datenbank speichern (für Datensicherheit)
+            # Zug sofort in Datenbank speichern (zur Datensicherheit)
             if self.current_game_id:
                 notation = self.get_move_notation(move)
                 white_time, black_time = self._extract_move_times(move)
@@ -588,21 +588,17 @@ class GameController:
         if result_type == 'checkmate':
             self._save_game_result(f'{winner}_win')
             self._show_game_over_popup('checkmate', winner)
-            return
         elif result_type == 'stalemate':
             self._save_game_result('Patt')
             self._show_game_over_popup('draw')
-            return
         elif result_type == 'draw':
             self._save_game_result('Remis')
             self._show_game_over_popup('draw')
-            return
         elif result_type == 'timeover':
             self._save_game_result(f'{winner}_win')
             self._show_time_up_popup(winner)
-            return
         else:
-            raise NotImplementedError('undefined')
+            raise NotImplementedError(f'Unbekannter result_type: {result_type}')
 
     def get_move_notation(self, move: Move) -> str:
         """

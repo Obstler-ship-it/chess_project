@@ -33,12 +33,14 @@ class DatabaseManager:
         cursor.execute("PRAGMA table_info(moves)")
         columns = [row[1] for row in cursor.fetchall()]
         
-        if 'white_time' not in columns:
-            cursor.execute('ALTER TABLE moves ADD COLUMN white_time TEXT')
-            self.conn.commit()
-        
-        if 'black_time' not in columns:
-            cursor.execute('ALTER TABLE moves ADD COLUMN black_time TEXT')
+        # Führe beide Änderungen in einer Transaktion durch
+        if 'white_time' not in columns or 'black_time' not in columns:
+            if 'white_time' not in columns:
+                cursor.execute('ALTER TABLE moves ADD COLUMN white_time TEXT')
+            
+            if 'black_time' not in columns:
+                cursor.execute('ALTER TABLE moves ADD COLUMN black_time TEXT')
+            
             self.conn.commit()
     
     def _create_tables(self):
