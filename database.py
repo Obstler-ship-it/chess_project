@@ -57,14 +57,16 @@ class DatabaseManager:
             )
         ''')
         
-        # Züge-Tabelle
+         # Züge-Tabelle
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS moves (
+            CREATE TABLE IF NOT EXISTS boards (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id INTEGER NOT NULL,
-                move_number INTEGER NOT NULL,
+                board_number INTEGER NOT NULL,
+                board_JSON TEXT NOT NULL,
                 notation TEXT NOT NULL,
-                timestamp TEXT NOT NULL,
+                white_time STRING,
+                black_time STRING,
                 FOREIGN KEY (game_id) REFERENCES games(id)
             )
         ''')
@@ -128,7 +130,6 @@ class DatabaseManager:
         row = cursor.fetchone()
         return dict(row) if row else None
     
-
     def get_leaderboard(self, limit: int = 10) -> List[dict]:
         """
         Holt die Top-Spieler sortiert nach Punkten.
@@ -186,22 +187,29 @@ class DatabaseManager:
         self.conn.commit()
         return cursor.lastrowid
     
-    def finish_game(self, game_id: int, result: str, final_position: str):
+    def finish_game(self, game_id: int, winner: str, result_type: str):
         """
         Beendet ein Spiel und aktualisiert Spieler-Statistiken.
         
         :param game_id: ID des Spiels
-        :param result: 'white_win', 'black_win', oder 'draw'
-        :param final_position: FEN-String der Endstellung
+        :param winner: 'white_win', 'black_win', 'draw' oder None
+        :param result_type: 'checkmate', 'Remis', 'Patt', 'timeover', etc.
         """
         cursor = self.conn.cursor()
+        
+        # Bestimme das result-Feld basierend auf winner
+        # result sollte 'white_win', 'black_win' oder 'draw' sein
+        if winner and '_win' in winner:
+            result = winner  # 'white_win' oder 'black_win'
+        else:
+            result = 'draw'  # Bei None oder anderen Werten
         
         # Spiel aktualisieren
         cursor.execute('''
             UPDATE games 
             SET end_time = ?, result = ?, final_position = ?
             WHERE id = ?
-        ''', (datetime.now().isoformat(), result, final_position, game_id))
+        ''', (datetime.now().isoformat(), result, result_type, game_id))
         
         # Spieler-IDs holen
         cursor.execute(
@@ -211,10 +219,10 @@ class DatabaseManager:
         white_id, black_id = cursor.fetchone()
         
         # Punkte vergeben
-        if result == 'white_win':
+        if winner == 'white_win':
             self.update_player_stats(white_id, 3, won=True)  # Gewinner: +3
             self.update_player_stats(black_id, 0, lost=True)  # Verlierer: 0
-        elif result == 'black_win':
+        elif winner == 'black_win':
             self.update_player_stats(black_id, 3, won=True)  # Gewinner: +3
             self.update_player_stats(white_id, 0, lost=True)  # Verlierer: 0
         else:  # draw
@@ -260,11 +268,11 @@ class DatabaseManager:
         
         return [dict(row) for row in cursor.fetchall()]
     
-    # ==================== ZUG-VERWALTUNG ====================
+    # ==================== BRETT-VERWALTUNG ====================
     
-    def add_move(self, game_id: int, move_number: int, notation: str):
+    def add_board(self, game_id: int, board_number: int, board_JSON: str, notation: str, white_time: str, black_time: str):
         """
-        Fügt einen Zug zu einem Spiel hinzu.
+        Fügt ein Brett zu einem Spiel hinzu.
         
         :param game_id: ID des Spiels
         :param move_number: Zugnummer
@@ -272,11 +280,11 @@ class DatabaseManager:
         """
         cursor = self.conn.cursor()
         cursor.execute('''
-            INSERT INTO moves (game_id, move_number, notation, timestamp)
-            VALUES (?, ?, ?, ?)
-        ''', (game_id, move_number, notation, datetime.now().isoformat()))
+            INSERT INTO boards (game_id, board_number, board_JSON, notation, white_time, black_time)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (game_id, board_number, board_JSON, notation, white_time, black_time))
         self.conn.commit()
-    
+           
     def get_game_moves(self, game_id: int) -> List[dict]:
         """
         Holt alle Züge eines Spiels in chronologischer Reihenfolge.
@@ -292,12 +300,24 @@ class DatabaseManager:
         ''', (game_id,))
         return [dict(row) for row in cursor.fetchall()]
     
+    def get_game_boards(self, game_id: int) -> List[dict]:
+        """
+        Holt alle gespeicherten Board-Zustände eines Spiels in chronologischer Reihenfolge.
+        
+        :param game_id: ID des Spiels
+        :return: Liste von Dicts mit Board-Daten (board_number, board_JSON, notation, times)
+        """
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT * FROM boards 
+            WHERE game_id = ? 
+            ORDER BY board_number
+        ''', (game_id,))
+        return [dict(row) for row in cursor.fetchall()]
+    
     def get_moves(self, game_id: int) -> List[dict]:
         """Alias für get_game_moves."""
         return self.get_game_moves(game_id)
-    
-    # ==================== REMIS-ANGEBOTE ====================
-    # Draw offers werden nicht über die DB gehandhabt, sondern direkt mit confirm_draw()
     
     # ==================== UTILITY ====================
     

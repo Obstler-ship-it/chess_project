@@ -1,0 +1,145 @@
+@startuml Chess_Move_Sequence
+
+' Styling
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 20
+skinparam maxmessagesize 60
+
+title Sequenzdiagramm: Spielzug ausführen
+
+actor Player as "Spieler"
+participant UI as "GameScreen"
+participant Board_Widget as "ChessBoard"
+participant Controller as "GameController"
+participant Logic as "ChessLogic"
+participant Board_Model as "Board"
+participant DB as "DatabaseManager"
+participant Timer as "ChessTimer"
+
+== Figur auswählen ==
+
+Player -> UI : Klick auf Feld (row, col)
+UI -> Board_Widget : on_touch_down()
+Board_Widget -> Controller : handle_square_click(row, col)
+
+Controller -> Board_Model : squares[row, col]
+Board_Model --> Controller : piece
+
+alt Figur der richtigen Farbe
+    Controller -> Controller : _select_piece(row, col)
+    Controller -> Board_Model : piece.get_legal_moves(board)
+    Board_Model --> Controller : legal_moves
+    
+    Controller -> Logic : filter_moves_for_check(moves, color)
+    
+    loop Für jeden Zug
+        Logic -> Board_Model : simulate move
+        Logic -> Board_Model : is_square_attacked_by(king_pos, enemy_color)
+        Board_Model --> Logic : is_attacked
+        Logic -> Board_Model : undo move
+    end
+    
+    Logic --> Controller : filtered_moves
+    Controller -> Board_Widget : highlight_moves(valid_moves)
+    Board_Widget --> UI : Zeige markierte Felder
+    UI --> Player : Visuelle Rückmeldung
+else Falsche Farbe oder leeres Feld
+    Controller --> UI : Ignoriere Klick
+end
+
+== Zug ausführen ==
+
+Player -> UI : Klick auf Zielfeld
+UI -> Board_Widget : on_touch_down()
+Board_Widget -> Controller : handle_square_click(target_row, target_col)
+
+Controller -> Controller : _move_selected_piece(target_row, target_col)
+
+alt Zug ist gültig
+    Controller -> Controller : make_move(move)
+    
+    ' Spezialfall: Promotion
+    alt Bauernumwandlung
+        Controller -> UI : show_promotion_popup(color, callback)
+        UI --> Player : Zeige Auswahl-Dialog
+        Player -> UI : Wählt Figur (z.B. Dame)
+        UI -> Controller : callback(chosen_piece)
+        Controller -> Controller : Setze promotion_piece im Move
+    end
+    
+    Controller -> Controller : complete_move(move)
+    
+    ' Board aktualisieren
+    Controller -> Board_Model : make_move(move)
+    
+    alt Normale Züge
+        Board_Model -> Board_Model : Bewege Figur
+    else Rochade
+        Board_Model -> Board_Model : Bewege König und Turm
+    else En Passant
+        Board_Model -> Board_Model : Bewege Bauer, entferne geschlagenen Bauern
+    else Promotion
+        Board_Model -> Board_Model : Ersetze Bauern durch gewählte Figur
+    end
+    
+    Board_Model --> Controller : move completed
+    
+    ' UI aktualisieren
+    Controller -> Board_Widget : update_board(board.squares)
+    Board_Widget -> Board_Widget : Aktualisiere Figuren-Positionen
+    Board_Widget --> UI : Board aktualisiert
+    
+    ' Zughistorie aktualisieren
+    Controller -> Controller : move_history.append(move)
+    Controller -> UI : update_move_history(move_history)
+    UI -> UI : Zeige Züge in Liste
+    
+    ' Timer umschalten
+    Controller -> Timer : switch_player()
+    Timer -> Timer : Stoppe aktiven Timer
+    Timer -> Timer : Starte anderen Timer
+    Timer -> UI : update_timer_display()
+    
+    ' In Datenbank speichern
+    Controller -> Controller : _serialize_board()
+    Controller -> DB : add_board(game_id, board_number, board_JSON, notation, times)
+    DB -> DB : INSERT INTO boards
+    DB --> Controller : board saved
+    
+    ' Spieler wechseln
+    Controller -> Controller : current_turn = opposite_color
+    Controller -> UI : update_turn_info(current_turn)
+    UI --> Player : "SCHWARZ IST AM ZUG"
+    
+    ' Prüfe Spielende
+    Controller -> Logic : calculate_all_moves()
+    Logic -> Logic : Berechne alle legalen Züge
+    Logic --> Controller : valid_moves
+    
+    alt Keine legalen Züge verfügbar
+        Controller -> Logic : is_in_check(current_turn)
+        Logic -> Board_Model : is_square_attacked_by(king_pos, enemy_color)
+        Board_Model --> Logic : is_in_check
+        Logic --> Controller : check_status
+        
+        alt Im Schach
+            Controller -> Controller : game_over('checkmate', winner)
+            Controller -> DB : finish_game(game_id, winner, 'checkmate')
+            Controller -> UI : show_game_over_popup('checkmate', winner)
+            UI --> Player : "SCHACHMATT! Weiß gewinnt"
+        else Nicht im Schach
+            Controller -> Controller : game_over('stalemate')
+            Controller -> DB : finish_game(game_id, 'draw', 'Patt')
+            Controller -> UI : show_game_over_popup('draw')
+            UI --> Player : "PATT! Remis"
+        end
+    else Spiel geht weiter
+        UI --> Player : Warte auf nächsten Zug
+    end
+    
+else Zug ist ungültig
+    Controller --> UI : Ignoriere Zug
+    UI --> Player : Keine Änderung
+end
+
+@enduml

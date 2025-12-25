@@ -30,11 +30,11 @@ class GameOverPopup(Popup):
             else:
                 winner_name = "Weiß" if winner == "white" else "Schwarz"
             message = f"{winner_name} gewinnt!"
-        elif result_type == "stalemate":
+        elif result_type == "draw":
             title_text = "PATT!"
             title_color = (0.7, 0.7, 0.3, 1)
             message = "Unentschieden!"
-        elif result_type == "draw":
+        elif result_type == "remis":
             title_text = "REMIS!"
             title_color = (0.7, 0.7, 0.3, 1)
             message = "Unentschieden!"

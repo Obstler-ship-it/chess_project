@@ -12,6 +12,7 @@ Trennung der Verantwortlichkeiten:
 - board.py/chess_logic.py: Spielregeln (Backend)
 """
 
+import json
 from typing import Optional
 from board import Board
 from pieces import Piece
@@ -68,7 +69,8 @@ class GameController:
         self.black_player = None
         self.use_timer = False
         self.time_per_player = None
-        
+        self.draw_offer = False 
+
         # Timer
         self.timer = None
         
@@ -151,19 +153,7 @@ class GameController:
             except:
                 pass
         
-        # Spiel zurücksetzen
-        self.board = None
-        self.chess_logic = None
-        self.current_turn = None
-        self.selected_piece = None
-        self.game_is_over = False
-        self.last_move = None
-        self.checkmate = None
-        self.move_history = []
-        self.valid_moves = []
-        self.legal_moves = []
-        self.pending_promotion_move = None
-        self.current_game_id = None
+        self.reset_game_state()
         
         # Zurück zum Hauptmenü
         self.go_to_menu()
@@ -185,7 +175,31 @@ class GameController:
         self.black_player = black_player
         self.use_timer = use_timer
         self.time_per_player = time_per_player
-    
+
+    def reset_game_state(self):
+        """Setzt den Spielzustand zurück (ohne Spieler-Infos)."""
+        self.board = None
+        self.chess_logic = None
+        self.current_turn = None
+        self.selected_piece = None
+        self.game_is_over = False
+        self.last_move = None
+        self.checkmate = None
+        self.move_history = []
+        self.valid_moves = []
+        self.legal_moves = []
+        self.pending_promotion_move = None
+        self.current_game_id = None
+        self.draw_offer = False
+        
+        # Timer stoppen
+        if self.timer:
+            try:
+                self.timer.stop()
+            except:
+                pass
+        self.timer = None
+
     def start_new_game(self):
         """
         Startet ein neues Spiel (wird aufgerufen wenn GameScreen geladen wird).
@@ -193,25 +207,22 @@ class GameController:
         Erstellt Board und chess_logic erst HIER, nicht im __init__!
         """
         try:
+            # Setze Spielzustand zurück
+            self.reset_game_state()
+            
+            # Initialisiere Spielzustand
+            self.current_turn = 'white'
+
             # Backend initialisieren
             self.board = Board()
             self.board.setup_startpos()  # Explizit aufrufen für neues Spiel
             self.chess_logic = ChessLogic(self.board)
-            
-            # Spielzustand zurücksetzen
-            self.current_turn = 'white'
-            self.selected_piece = None
-            self.last_move = None
-            self.checkmate = None
-            self.game_is_over = False
-            self.move_history = []
-            self.valid_moves = []
+
+            # Spiel in Datenbank erstellen
+            self._create_game_in_database()
             
             # Berechne initiale legale Züge
             self.valid_moves = self.chess_logic.calculate_all_moves()  # Methode mit () aufrufen!
-            
-            # Spiel in Datenbank erstellen
-            self._create_game_in_database()
             
             # Timer initialisieren
             if self.use_timer and self.time_per_player:
@@ -492,10 +503,7 @@ class GameController:
             
             # Spieler wechseln
             self.current_turn = 'black' if self.current_turn == 'white' else 'white'
-            
-            # Gültige Züge für nächsten Spieler berechnen
-            self._update_valid_moves()
-            
+
             # Auswahl aufheben
             self._deselect_piece()
             
@@ -507,29 +515,29 @@ class GameController:
             if self.timer:
                 self.timer.switch_player()
 
+            # DB aktualisieren
+            if self.current_game_id:
+                self.db.add_board(
+                    game_id=self.current_game_id,
+                    board_number=len(self.move_history),
+                    board_JSON=self._serialize_board(),
+                    notation=self.get_move_notation(self.last_move),
+                    white_time=str(self.timer.white_time) if self.timer else "0",
+                    black_time=str(self.timer.black_time) if self.timer else "0"
+                )
+            
+            # Remis-Angebot zurücksetzen
+            self.draw_offer = False
+
+            # Gültige Züge für nächsten Spieler berechnen
+            self._update_valid_moves()
+
             if self.game_screen:
                 self.game_screen.update_turn_info(self.current_turn)
                 self.game_screen.update_move_history(self.move_history)
         except Exception as e:
             self._handle_game_error(e, "bei der Zugvervollständigung")
-    
-    # ==================== Timer-Management ====================
-    
-    def _on_timer_expired(self, color):
-        """
-        Callback wenn die Zeit eines Spielers abgelaufen ist.
-        
-        Args:
-            color: 'white' oder 'black' - wer hat keine Zeit mehr
-        """
-        # Gewinner ist der andere Spieler
-        winner = 'black' if color == 'white' else 'white'
-        
-        # Zeige Game-Over Popup
-        self.game_over('timeover', winner)
-    
-    # ==================== Hilfsmethoden ====================
-    
+
     def game_over(self, result_type, winner=None):
         """
         Beendet das Spiel und zeigt Game-Over Popup an.
@@ -547,37 +555,90 @@ class GameController:
         
         # Gewinner ist der ANDERE Spieler (der gerade gezogen hat)
         winner = 'black' if self.current_turn == 'white' else 'white'
-            
+
         # Spielergebnis in Datenbank speichern
         if result_type == 'checkmate':
-            self._save_game_result(f'{winner}_win')
+            self._save_game_result(f'{winner}_win', 'checkmate')
             self._show_game_over_popup('checkmate', winner)
             return
         elif result_type == 'stalemate':
-            self._save_game_result('Patt')
+            self._save_game_result(None, 'Patt')
             self._show_game_over_popup('draw')
             return
         elif result_type == 'draw':
-            self._save_game_result('Remis')
+            self._save_game_result(None, 'Remis')
             self._show_game_over_popup('draw')
             return
+        elif result_type == 'remis':
+            self._save_game_result(None, 'Remis')
+            self._show_game_over_popup('remis')
+            return
         elif result_type == 'timeover':
-            self._save_game_result(f'{winner}_win')
+            self._save_game_result(f'{winner}_win', 'timeover')
             self._show_time_up_popup(winner)
             return
         else:
             raise NotImplementedError('undefined')
+
+    # ==================== Timer-Management ====================
+    
+    def _on_timer_expired(self, color):
+        """
+        Callback wenn die Zeit eines Spielers abgelaufen ist.
+        
+        Args:
+            color: 'white' oder 'black' - wer hat keine Zeit mehr
+        """
+        # Gewinner ist der andere Spieler
+        winner = 'black' if color == 'white' else 'white'
+        
+        # Zeige Game-Over Popup
+        self.game_over('timeover', winner)
+
+    # ==================== Remis-Funktionalität ====================
+    
+    def request_draw(self):
+        """
+        Wird aufgerufen wenn Remis-Button gedrückt wird.
+        Öffnet Bestätigungs-Popup.
+        """
+        if self.game_is_over:
+            return  # Kein Remis nach Spielende möglich
+        
+        if self.game_screen:
+            self.game_screen.show_draw_confirm_popup()
+            self.draw_offer = True
+    
+    def confirm_draw(self):
+        """
+        Wird aufgerufen wenn Remis im Popup bestätigt wurde.
+        Beendet das Spiel mit Remis-Ergebnis.
+        """
+        if self.game_is_over:
+            return
+        
+        # Speichere finalen Board-Zustand mit akzeptiertem Remis
+        # (beide Spieler haben zugestimmt)
+        if self.current_game_id:
+            # Setze draw_offer auf True für BEIDE Spieler, um zu zeigen dass es akzeptiert wurde
+            old_draw_offer = self.draw_offer
+            self.draw_offer = True  # Temporär für Serialisierung
             
-        for index, move in enumerate(self.move_historie):
-            # Zug in Datenbank speichern
-            if self.current_game_id:
-                notation = self.get_move_notation(move)
-                self.db.add_move(
-                    game_id=self.current_game_id,
-                    move_number=index,
-                    move = move,
-                    notation=notation
-                )
+            self.db.add_board(
+                game_id=self.current_game_id,
+                board_number=len(self.move_history) + 1,
+                board_JSON=self._serialize_board_with_accepted_draw(),
+                notation="Remis akzeptiert",
+                white_time=str(self.timer.white_time) if self.timer else "0",
+                black_time=str(self.timer.black_time) if self.timer else "0"
+            )
+            
+            self.draw_offer = old_draw_offer
+        
+        # Spiel als beendet markieren
+        self.game_over('remis', None)
+    
+    # ==================== Hilfsmethoden ====================
 
     def get_move_notation(self, move: Move) -> str:
         """
@@ -643,22 +704,30 @@ class GameController:
             game_type=game_type,
             time_per_player=self.time_per_player
         )
+        
+        # Startposition speichern (board_number = 0)
+        if self.current_game_id and self.board:
+            self.db.add_board(
+                game_id=self.current_game_id,
+                board_number=0,
+                board_JSON=self._serialize_board(),
+                notation="Startposition",
+                white_time=str(self.timer.white_time) if self.timer else "0",
+                black_time=str(self.timer.black_time) if self.timer else "0"
+            )
     
-    def _save_game_result(self, result):
+    def _save_game_result(self, winner, result_type):
         """
         Speichert Spielergebnis in Datenbank.
         
         Args:
-            result: 'white_win', 'black_win', oder 'draw'
+            winner: 'white', 'black', oder None für Remis
         """
         if not self.current_game_id:
             return  # Kein Spiel zu speichern
         
-        # Board-Zustand als JSON serialisieren
-        final_position = self._serialize_board()
-        
         # Spiel beenden und Statistiken aktualisieren
-        self.db.finish_game(self.current_game_id, result, final_position)
+        self.db.finish_game(self.current_game_id, winner, result_type)
         self.current_game_id = None
     
     def _serialize_board(self) -> str:
@@ -677,39 +746,100 @@ class GameController:
         for row in range(8):
             for col in range(8):
                 piece = self.board.squares[row, col]
-                if piece:
-                    board_data.append({
-                        "row": row,
-                        "col": col,
-                        "type": piece.__class__.__name__,
-                        "color": piece.color
-                    })
-        
+                board_data.append({
+                    "row": row,
+                    "col": col,
+                    "image_path": piece.get_image_path() if piece else None,
+                })
+
+        board_data.append({
+            "turn": self.current_turn,
+            "white_time": self.timer.white_time if self.timer else None,
+            "black_time": self.timer.black_time if self.timer else None,
+            "draw_offers": {"white": self.draw_offer and self.current_turn == 'black', "black": self.draw_offer and self.current_turn == 'white'},
+        })
+
         return json.dumps(board_data)
     
-    # ==================== Remis-Funktionalität ====================
-    
-    def request_draw(self):
+    def _serialize_board_with_accepted_draw(self) -> str:
         """
-        Wird aufgerufen wenn Remis-Button gedrückt wird.
-        Öffnet Bestätigungs-Popup.
-        """
-        if self.game_is_over:
-            return  # Kein Remis nach Spielende möglich
+        Serialisiert das Board mit akzeptiertem Remis (beide Spieler haben zugestimmt).
         
-        if self.game_screen:
-            self.game_screen.show_draw_confirm_popup()
-    
-    def confirm_draw(self):
+        Returns:
+            JSON-String mit Board-Zustand
         """
-        Wird aufgerufen wenn Remis im Popup bestätigt wurde.
-        Beendet das Spiel mit Remis-Ergebnis.
-        """
-        if self.game_is_over:
-            return
+        if not self.board:
+            return ""
         
-        # Spiel als beendet markieren
-        self.game_over('draw', None)
+        import json
+        board_data = []
+        
+        for row in range(8):
+            for col in range(8):
+                piece = self.board.squares[row, col]
+                board_data.append({
+                    "row": row,
+                    "col": col,
+                    "image_path": piece.get_image_path() if piece else None,
+                })
+
+        # Beide Spieler haben Remis akzeptiert
+        board_data.append({
+            "turn": self.current_turn,
+            "white_time": self.timer.white_time if self.timer else None,
+            "black_time": self.timer.black_time if self.timer else None,
+            "draw_offers": {"white": True, "black": True},  # BEIDE haben akzeptiert
+        })
+
+        return json.dumps(board_data)
+    
+    def _deserialize_board(self, board_json: str):
+        """
+        Deserialisiert ein Board aus einem JSON-String.
+        
+        Args:
+            board_json: JSON-String mit Board-Zustand
+            
+        Returns:
+            numpy array mit Board-Zustand
+        """
+        import json
+        import numpy as np
+        from pieces import King, Queen, Rook, Bishop, Knight, Pawn
+        
+        board_data = json.loads(board_json)
+        
+        # Erstelle leeres 8x8 Board
+        board_array = np.empty((8, 8), dtype=object)
+        
+        # Mapping von Notation zu Klassen
+        piece_classes = {
+            'K': King,
+            'Q': Queen,
+            'R': Rook,
+            'B': Bishop,
+            'N': Knight,
+            'P': Pawn
+        }
+        
+        # Fülle Board mit Figuren aus JSON
+        for item in board_data:
+            if 'row' in item and 'col' in item:
+                row, col = item['row'], item['col']
+                image_path = item['image_path']
+                
+                if image_path:
+                    # Parse image_path: 'pieces/white_K.png' -> color='white', notation='K'
+                    parts = image_path.split('/')[-1].replace('.png', '').split('_')
+                    if len(parts) == 2:
+                        color, notation = parts
+                        
+                        # Erstelle entsprechende Figur
+                        piece_class = piece_classes.get(notation)
+                        if piece_class:
+                            board_array[row, col] = piece_class(color, (row, col))
+        
+        return board_array
     
     # ==================== Öffentliche Datenbank-API für UI ====================
     
@@ -787,54 +917,57 @@ class GameController:
     
     def load_game_for_replay(self, game_id: int):
         """
-        Lädt ein Spiel und seine Züge für das Replay.
+        Lädt ein Spiel und seine Boards für das Replay.
         
         Args:
             game_id: ID des Spiels
             
         Returns:
-            Tuple (game_data, moves_list) - Spieldaten und Liste der Zugnotationen
+            Tuple (game_data, boards_list) - Spieldaten und Liste der Board-Daten
         """
         game_data = self.db.get_game(game_id)
         
         if not game_data:
             return None, []
         
-        # Züge aus der Datenbank holen
-        moves = self.db.get_moves(game_id)
+        # Boards aus der Datenbank holen
+        boards = self.db.get_game_boards(game_id)
         
-        # Nur die Notationen extrahieren
-        move_notations = [move['notation'] for move in moves]
+        # Boards für Replay speichern
+        self._replay_boards = boards
         
-        return game_data, move_notations
+        return game_data, boards
     
     def get_replay_position(self, move_index: int):
         """
         Gibt das Board-Array für eine bestimmte Zugposition im Replay zurück.
         
         Args:
-            move_index: Index des Zugs (0 = Startposition)
+            move_index: Index des Boards (0 = Startposition)
             
         Returns:
             numpy array mit der Board-Position
         """
-        # Erstelle ein neues Board in Startposition
-        from board import Board
-        replay_board = Board()
-        replay_board.setup_startpos()
-        
-        # Wenn move_index 0 ist, gib Startposition zurück
-        if move_index == 0:
+        # Prüfe ob Replay-Boards geladen sind
+        if not hasattr(self, '_replay_boards') or not self._replay_boards:
+            # Fallback: Erstelle Startposition
+            from board import Board
+            replay_board = Board()
+            replay_board.setup_startpos()
             return replay_board.squares
         
-        # Lade Züge aus der Datenbank (wird in load_game_for_replay gesetzt)
-        if not hasattr(self, '_replay_moves') or not self._replay_moves:
+        # Index 0 sollte die Startposition sein
+        if move_index < 0 or move_index >= len(self._replay_boards):
+            # Fallback: Erstelle Startposition
+            from board import Board
+            replay_board = Board()
+            replay_board.setup_startpos()
             return replay_board.squares
         
-        # Spiele Züge bis zum angegebenen Index nach
-        # HINWEIS: Dies ist eine vereinfachte Version
-        # Für vollständiges Replay müsste man die Züge wirklich ausführen
-        # Das würde erfordern, die Notation in Move-Objekte zu parsen
-        # Für jetzt geben wir die Startposition zurück
+        # Lade das entsprechende Board aus der Datenbank
+        board_data = self._replay_boards[move_index]
+        board_json = board_data['board_JSON']
         
+        # Deserialisiere und gib Board zurück
+        return self._deserialize_board(board_json)
         return replay_board.squares

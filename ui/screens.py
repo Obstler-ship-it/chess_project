@@ -1006,6 +1006,11 @@ class GameHistoryScreen(ScreenBackgroundMixin, PanelMixin, Screen):
         main_layout.add_widget(panel)
         self.add_widget(main_layout)
 
+    def _rgb_to_hex(self, rgb_tuple):
+        """Konvertiert RGB-Tupel (0-1) zu Hex-String für Markup."""
+        r, g, b, a = rgb_tuple
+        return f"{int(r*255):02X}{int(g*255):02X}{int(b*255):02X}"
+
     def on_pre_enter(self):
         self.load_game_history()
 
@@ -1029,53 +1034,102 @@ class GameHistoryScreen(ScreenBackgroundMixin, PanelMixin, Screen):
             if not white or not black:
                 continue
 
-            if game["result"] == "white_win":
-                result_text = f"{white['username']} gewonnen"
+            # Ergebnis und Ergebnistyp
+            result = game.get("result", "")
+            result_type = game.get("final_position", "")
+            
+            if result == "white_win":
+                winner_name = white['username']
+                if result_type == "checkmate":
+                    result_text = f"{winner_name} - Schachmatt"
+                elif result_type == "timeover":
+                    result_text = f"{winner_name} - Zeit"
+                else:
+                    result_text = f"{winner_name} gewinnt"
                 result_color = (0.3, 0.8, 0.3, 1)
-            elif game["result"] == "black_win":
-                result_text = f"{black['username']} gewonnen"
+            elif result == "black_win":
+                winner_name = black['username']
+                if result_type == "checkmate":
+                    result_text = f"{winner_name} - Schachmatt"
+                elif result_type == "timeover":
+                    result_text = f"{winner_name} - Zeit"
+                else:
+                    result_text = f"{winner_name} gewinnt"
                 result_color = (0.3, 0.8, 0.3, 1)
-            elif game["result"] == "draw":
-                result_text = "Remis"
+            elif result == "draw":
+                if result_type == "Patt":
+                    result_text = "Patt"
+                elif result_type == "remis":
+                    result_text = "Remis vereinbart"
+                else:
+                    result_text = "Remis"
                 result_color = (0.8, 0.8, 0.3, 1)
             else:
-                result_text = "Laufend"
+                result_text = "Nicht beendet"
                 result_color = (0.6, 0.6, 0.7, 1)
 
             game_type = "Timer" if game["game_type"] == "timed" else "Ohne Timer"
             start_time = game["start_time"][:16].replace("T", " ")
 
-            game_btn = Button(size_hint_y=None, height=80, background_normal="", background_color=(0.2, 0.22, 0.28, 1))
+            # Widget-Container statt Button für bessere Kontrolle
+            game_widget = BoxLayout(orientation="vertical", size_hint_y=None, height=110, padding=[10, 8], spacing=6)
+            
+            # Hintergrund
+            with game_widget.canvas.before:
+                Color(0.22, 0.24, 0.30, 1)
+                game_rect = Rectangle()
+            game_widget.bind(
+                pos=lambda instance, value, r=game_rect: setattr(r, "pos", instance.pos),
+                size=lambda instance, value, r=game_rect: setattr(r, "size", instance.size)
+            )
 
-            btn_layout = BoxLayout(orientation="vertical", padding=[10, 5])
-
-            players_label = Label(text=f"[b]{white['username']}[/b]  vs  [b]{black['username']}[/b]", font_size="18sp", markup=True, size_hint=(1, 0.4), halign="center", valign="middle")
+            # Spielernamen
+            players_label = Label(
+                text=f"[b][color=FFFFFF]{white['username']}[/color][/b]  vs  [b][color=DDDDDD]{black['username']}[/color][/b]", 
+                font_size="19sp", 
+                markup=True, 
+                size_hint=(1, 0.35), 
+                halign="center",
+                valign="middle"
+            )
             players_label.bind(size=lambda l, s: setattr(l, "text_size", (s[0], s[1])))
-            btn_layout.add_widget(players_label)
+            game_widget.add_widget(players_label)
 
-            info_box = BoxLayout(orientation="horizontal", size_hint=(1, 0.3))
-            result_label = Label(text=result_text, font_size="14sp", color=result_color, size_hint=(0.4, 1))
-            type_label = Label(text=game_type, font_size="14sp", size_hint=(0.3, 1), color=(0.7, 0.75, 0.8, 1))
-            time_label = Label(text=start_time, font_size="12sp", size_hint=(0.3, 1), color=(0.6, 0.65, 0.7, 1))
-            info_box.add_widget(result_label)
-            info_box.add_widget(type_label)
-            info_box.add_widget(time_label)
-            btn_layout.add_widget(info_box)
+            # Ergebnis
+            result_label = Label(
+                text=f"[color={self._rgb_to_hex(result_color)}][b]{result_text}[/b][/color]", 
+                font_size="17sp", 
+                markup=True,
+                size_hint=(1, 0.35),
+                halign="center",
+                valign="middle"
+            )
+            result_label.bind(size=lambda l, s: setattr(l, "text_size", (s[0], s[1])))
+            game_widget.add_widget(result_label)
 
-            game_btn.add_widget(btn_layout)
+            # Typ und Zeit
+            info_label = Label(
+                text=f"[color=AAAAAA]{game_type}  •  {start_time}[/color]",
+                font_size="14sp",
+                markup=True,
+                size_hint=(1, 0.25),
+                halign="center",
+                valign="middle"
+            )
+            info_label.bind(size=lambda l, s: setattr(l, "text_size", (s[0], s[1])))
+            game_widget.add_widget(info_label)
 
-            game_btn.bind(on_press=lambda btn, g=game: self.view_game(g))
-
-            def on_btn_press(instance):
-                instance.background_color = (0.25, 0.27, 0.35, 1)
-
-            def on_btn_release(instance):
-                instance.background_color = (0.2, 0.22, 0.28, 1)
-
-            game_btn.bind(on_press=on_btn_press)
-            game_btn.bind(on_release=lambda btn, g=game: (on_btn_release(btn), self.view_game(g)))
-
-            self.games_container.add_widget(game_btn)
+            # Mache das Widget klickbar
+            from kivy.uix.behaviors import ButtonBehavior
+            
+            class ClickableBox(ButtonBehavior, BoxLayout):
+                pass
+            
+            clickable_widget = ClickableBox(orientation="vertical", size_hint_y=None, height=110)
+            clickable_widget.add_widget(game_widget)
+            clickable_widget.bind(on_press=lambda instance, g=game: self.view_game(g))
+            
+            self.games_container.add_widget(clickable_widget)
 
     def view_game(self, game):
         if self.controller:
@@ -1119,19 +1173,34 @@ class GameReplayScreen(ScreenBackgroundMixin, Screen):
 
         game_layout = BoxLayout(orientation="horizontal", size_hint=(1, 0.82), spacing=15)
 
+        # Board-Container mit horizontaler und vertikaler Zentrierung
         board_container = BoxLayout(orientation="vertical", size_hint=(0.7, 1))
+        vertical_spacer_top = Widget(size_hint=(1, 0.5))
+        
+        horizontal_container = BoxLayout(orientation="horizontal", size_hint=(1, None))
+        horizontal_container.bind(minimum_height=horizontal_container.setter("height"))
+        
+        horizontal_spacer_left = Widget(size_hint=(0.5, 1))
         self.board = ChessBoard(board_array=None)
         self.board.size_hint = (None, None)
         self.board.bind(size=self._update_board_size)
+        horizontal_spacer_right = Widget(size_hint=(0.5, 1))
+        
+        horizontal_container.add_widget(horizontal_spacer_left)
+        horizontal_container.add_widget(self.board)
+        horizontal_container.add_widget(horizontal_spacer_right)
+        
+        vertical_spacer_bottom = Widget(size_hint=(1, 0.5))
+        
         board_container.bind(size=self._update_board_size)
-        board_container.add_widget(Widget())
-        board_container.add_widget(self.board)
-        board_container.add_widget(Widget())
+        board_container.add_widget(vertical_spacer_top)
+        board_container.add_widget(horizontal_container)
+        board_container.add_widget(vertical_spacer_bottom)
         game_layout.add_widget(board_container)
 
         right_panel = BoxLayout(orientation="vertical", size_hint=(0.3, 1), spacing=10)
 
-        move_info_box = BoxLayout(orientation="vertical", size_hint=(1, 0.3), padding=[10, 10])
+        move_info_box = BoxLayout(orientation="vertical", size_hint=(1, 0.2), padding=[10, 10])
         with move_info_box.canvas.before:
             Color(0.15, 0.18, 0.22, 0.9)
             self.move_info_bg = Rectangle()
@@ -1141,9 +1210,51 @@ class GameReplayScreen(ScreenBackgroundMixin, Screen):
         move_info_box.add_widget(self.move_info_label)
         right_panel.add_widget(move_info_box)
 
-        right_panel.add_widget(Widget(size_hint=(1, 0.1)))
+        # Timer-Anzeige wie in GameScreen
+        timer_box = BoxLayout(orientation="vertical", size_hint=(1, 0.25), spacing=5, padding=[10, 5])
+        with timer_box.canvas.before:
+            Color(0.15, 0.18, 0.22, 0.9)
+            self.timer_bg = Rectangle()
+        timer_box.bind(pos=self._update_timer_bg, size=self._update_timer_bg)
 
-        history_box = BoxLayout(orientation="vertical", size_hint=(1, 0.6), padding=[10, 10])
+        timer_title = Label(text="Timer", font_size="18sp", size_hint=(1, 0.2), bold=True, color=(0.9, 0.92, 1, 1))
+        timer_box.add_widget(timer_title)
+
+        white_timer_box = BoxLayout(orientation="horizontal", size_hint=(1, 0.4), padding=[5, 2])
+        self.white_timer_label = Label(text="Weiß: --:--", font_size="18sp", size_hint=(1, 1), halign="left", valign="middle", color=(0.9, 0.92, 1, 1))
+        self.white_timer_label.bind(size=self.white_timer_label.setter("text_size"))
+        white_timer_box.add_widget(self.white_timer_label)
+        with white_timer_box.canvas.before:
+            Color(0.2, 0.3, 0.2, 1)
+            self.white_timer_bg_rect = Rectangle()
+        white_timer_box.bind(pos=self._update_white_timer_bg, size=self._update_white_timer_bg)
+        timer_box.add_widget(white_timer_box)
+
+        black_timer_box = BoxLayout(orientation="horizontal", size_hint=(1, 0.4), padding=[5, 2])
+        self.black_timer_label = Label(text="Schwarz: --:--", font_size="18sp", size_hint=(1, 1), halign="left", valign="middle", color=(0.9, 0.92, 1, 1))
+        self.black_timer_label.bind(size=self.black_timer_label.setter("text_size"))
+        black_timer_box.add_widget(self.black_timer_label)
+        with black_timer_box.canvas.before:
+            Color(0.2, 0.2, 0.3, 1)
+            self.black_timer_bg_rect = Rectangle()
+        black_timer_box.bind(pos=self._update_black_timer_bg, size=self._update_black_timer_bg)
+        timer_box.add_widget(black_timer_box)
+
+        right_panel.add_widget(timer_box)
+
+        # Remis-Angebot Anzeige
+        self.draw_offer_box = BoxLayout(orientation="vertical", size_hint=(1, 0.08), padding=[10, 5])
+        with self.draw_offer_box.canvas.before:
+            self.draw_offer_color = Color(0.9, 0.7, 0.3, 0)  # Speichere Color-Objekt
+            self.draw_offer_bg = Rectangle()
+        self.draw_offer_box.bind(pos=self._update_draw_offer_bg, size=self._update_draw_offer_bg)
+        self.draw_offer_label = Label(text="", font_size="16sp", bold=True, color=(1, 1, 1, 1), size_hint=(1, 1))
+        self.draw_offer_box.add_widget(self.draw_offer_label)
+        right_panel.add_widget(self.draw_offer_box)
+
+        right_panel.add_widget(Widget(size_hint=(1, 0.02)))
+
+        history_box = BoxLayout(orientation="vertical", size_hint=(1, 0.45), padding=[10, 10])
         with history_box.canvas.before:
             Color(0.15, 0.18, 0.22, 0.9)
             self.history_bg = Rectangle()
@@ -1170,7 +1281,7 @@ class GameReplayScreen(ScreenBackgroundMixin, Screen):
         first_btn.bind(on_press=self.go_to_first)
         control_box.add_widget(first_btn)
 
-        prev_btn = Button(text="Zurueck", font_size="18sp", background_color=(0.3, 0.4, 0.7, 1), bold=True)
+        prev_btn = Button(text="Zurück", font_size="18sp", background_color=(0.3, 0.4, 0.7, 1), bold=True)
         prev_btn.bind(on_press=self.prev_move)
         control_box.add_widget(prev_btn)
 
@@ -1189,7 +1300,7 @@ class GameReplayScreen(ScreenBackgroundMixin, Screen):
         if not self.controller:
             return
 
-        self.game_data, self.moves = self.controller.load_game_for_replay(game_id)
+        self.game_data, self.boards = self.controller.load_game_for_replay(game_id)
 
         if not self.game_data:
             self.game_info_label.text = "Fehler beim Laden des Spiels"
@@ -1201,11 +1312,13 @@ class GameReplayScreen(ScreenBackgroundMixin, Screen):
         # Spielergebnis formatieren
         result = self.game_data.get("result", "")
         if result == "white_win":
-            result_text = f"[color=4dcc4d]{white_player['username']} gewonnen[/color]"
+            result_text = f"[color=4dcc4d]{white_player['username']} hat gewonnen[/color]"
         elif result == "black_win":
-            result_text = f"[color=4dcc4d]{black_player['username']} gewonnen[/color]"
+            result_text = f"[color=4dcc4d]{black_player['username']} hat gewonnen[/color]"
         elif result == "draw":
-            result_text = "[color=cccc4d]Remis[/color]"
+            result_text = "[color=cccc4d]PATT[/color]"
+        elif result == "remis":
+            result_text = "[color=cccc4d]REMIS[/color]"
         else:
             result_text = "[color=9999aa]Laufend[/color]"
 
@@ -1223,14 +1336,95 @@ class GameReplayScreen(ScreenBackgroundMixin, Screen):
         if board_array is not None:
             self.board.update_board(board_array)
 
-        total_moves = len(self.moves)
+        # Zähle Züge ohne Startposition (board_number=0)
+        total_moves = (len(self.boards) - 1) if hasattr(self, 'boards') else 0
         self.move_info_label.text = f"Zug {self.current_move_index} / {total_moves}"
+
+        # Timer und Remis-Angebot aktualisieren
+        self._update_timer_and_draw_offer()
 
         self.update_history_display()
 
+    def _update_timer_and_draw_offer(self):
+        """Aktualisiert Timer und Remis-Angebot-Anzeige aus den Board-Daten."""
+        if not hasattr(self, 'boards') or not self.boards:
+            return
+
+        if self.current_move_index < 0 or self.current_move_index >= len(self.boards):
+            return
+
+        # Hole das aktuelle Board
+        board_data = self.boards[self.current_move_index]
+        board_json = board_data.get('board_JSON', '')
+
+        if not board_json:
+            return
+
+        try:
+            import json
+            board_array = json.loads(board_json)
+
+            # Das letzte Element enthält Metadaten (turn, white_time, black_time, draw_offers)
+            if board_array and isinstance(board_array[-1], dict):
+                metadata = board_array[-1]
+
+                # Timer aktualisieren
+                white_time = metadata.get('white_time')
+                black_time = metadata.get('black_time')
+
+                if self.game_data:
+                    white_player = self.controller.get_player_by_id(self.game_data["white_player_id"])
+                    black_player = self.controller.get_player_by_id(self.game_data["black_player_id"])
+                    white_name = white_player.get('username', 'Weiß')
+                    black_name = black_player.get('username', 'Schwarz')
+                else:
+                    white_name = "Weiß"
+                    black_name = "Schwarz"
+
+                if white_time is not None:
+                    white_minutes = int(white_time) // 60
+                    white_seconds = int(white_time) % 60
+                    self.white_timer_label.text = f"{white_name}: {white_minutes:02d}:{white_seconds:02d}"
+                else:
+                    self.white_timer_label.text = f"{white_name}: --:--"
+
+                if black_time is not None:
+                    black_minutes = int(black_time) // 60
+                    black_seconds = int(black_time) % 60
+                    self.black_timer_label.text = f"{black_name}: {black_minutes:02d}:{black_seconds:02d}"
+                else:
+                    self.black_timer_label.text = f"{black_name}: --:--"
+
+                # Remis-Angebot aktualisieren
+                draw_offers = metadata.get('draw_offers', {})
+                if draw_offers and (draw_offers.get('white') or draw_offers.get('black')):
+                    # Zeige Remis-Angebot an
+                    if draw_offers.get('white') and draw_offers.get('black'):
+                        self.draw_offer_label.text = "Remis wurde akzeptiert"
+                    elif draw_offers.get('white'):
+                        self.draw_offer_label.text = "Weiß hat Remis angeboten"
+                    elif draw_offers.get('black'):
+                        self.draw_offer_label.text = "Schwarz hat Remis angeboten"
+                    # Setze Hintergrund auf sichtbar (gelb)
+                    self.draw_offer_color.a = 1
+                else:
+                    # Kein Remis-Angebot - verstecke Box
+                    self.draw_offer_label.text = ""
+                    self.draw_offer_color.a = 0
+
+        except (json.JSONDecodeError, KeyError, IndexError) as e:
+            # Falls Fehler beim Parsen: Ignorieren
+            pass
+
     def update_history_display(self):
-        # Verwende gemeinsame Hilfsfunktion (self.moves sind bereits Strings)
-        create_move_history_display(self.history_container, self.moves)
+        # Extrahiere Notationen aus den Board-Daten (ohne Startposition)
+        if hasattr(self, 'boards') and self.boards:
+            # Filtere Startposition heraus (notation == "Startposition")
+            move_notations = [board['notation'] for board in self.boards if board['notation'] != "Startposition"]
+        else:
+            move_notations = []
+        # Verwende gemeinsame Hilfsfunktion
+        create_move_history_display(self.history_container, move_notations)
 
     def go_to_first(self, instance):
         self.current_move_index = 0
@@ -1242,13 +1436,14 @@ class GameReplayScreen(ScreenBackgroundMixin, Screen):
             self.show_position()
 
     def next_move(self, instance):
-        if self.current_move_index < len(self.moves):
+        if hasattr(self, 'boards') and self.current_move_index < len(self.boards) - 1:
             self.current_move_index += 1
             self.show_position()
 
     def go_to_last(self, instance):
-        self.current_move_index = len(self.moves)
-        self.show_position()
+        if hasattr(self, 'boards'):
+            self.current_move_index = len(self.boards) - 1
+            self.show_position()
 
     def go_back(self, instance):
         if self.controller:
@@ -1272,6 +1467,22 @@ class GameReplayScreen(ScreenBackgroundMixin, Screen):
     def _update_move_info_bg(self, instance, value):
         self.move_info_bg.pos = instance.pos
         self.move_info_bg.size = instance.size
+
+    def _update_timer_bg(self, instance, value):
+        self.timer_bg.pos = instance.pos
+        self.timer_bg.size = instance.size
+
+    def _update_white_timer_bg(self, instance, value):
+        self.white_timer_bg_rect.pos = instance.pos
+        self.white_timer_bg_rect.size = instance.size
+
+    def _update_black_timer_bg(self, instance, value):
+        self.black_timer_bg_rect.pos = instance.pos
+        self.black_timer_bg_rect.size = instance.size
+
+    def _update_draw_offer_bg(self, instance, value):
+        self.draw_offer_bg.pos = instance.pos
+        self.draw_offer_bg.size = instance.size
 
     def _update_history_bg(self, instance, value):
         self.history_bg.pos = instance.pos
