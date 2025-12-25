@@ -7,14 +7,15 @@ Der GameController verwaltet:
 3. Spiellogik-Vermittlung (Board ↔ GUI)
 
 Trennung der Verantwortlichkeiten:
-- kivy_main.py: UI-Darstellung (WIE sieht es aus?)
-- game_controller.py: Logik und Navigation (WAS passiert?)
+- kivy_main.py: UI-Darstellung (Frontend)
+- game_controller.py: Logik und Navigation
 - board.py/chess_logic.py: Spielregeln (Backend)
 """
 
 import json
 from typing import Optional
 from board import Board
+import board
 from pieces import Piece
 from chess_logic import ChessLogic
 from move import Move
@@ -951,16 +952,14 @@ class GameController:
         # Prüfe ob Replay-Boards geladen sind
         if not hasattr(self, '_replay_boards') or not self._replay_boards:
             # Fallback: Erstelle Startposition
-            from board import Board
-            replay_board = Board()
+            replay_board = board.Board()
             replay_board.setup_startpos()
             return replay_board.squares
         
         # Index 0 sollte die Startposition sein
         if move_index < 0 or move_index >= len(self._replay_boards):
             # Fallback: Erstelle Startposition
-            from board import Board
-            replay_board = Board()
+            replay_board = board.Board()
             replay_board.setup_startpos()
             return replay_board.squares
         
