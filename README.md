@@ -138,7 +138,7 @@ chess_project/
 │   └── test_database.py             # Tests für Datenbank
 ├── pyproject.toml                   # Paket-Konfiguration
 ├── README.md                        # Diese Datei
-├── LICENSE                          # MIT-Lizenz
+├── LICENSE                          # BSD-Lizenz
 ├── class_diagram.puml               # UML-Klassendiagramm
 └── sequence_diagram.puml            # UML-Sequenzdiagramm
 ```
