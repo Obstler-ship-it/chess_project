@@ -1,2 +1,0 @@
-[console_scripts]
-chess = chess_project.main:main
