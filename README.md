@@ -100,13 +100,29 @@ chess
 
 ### Spielanleitung
 
-1. **Neues Spiel**: "Neues Spiel" im Hauptmenü wählen
-2. **Spieler wählen**: Namen für Weiß/Schwarz eingeben; optional Timer aktivieren (Minuten pro Spieler)
-3. **Zug ausführen**:
-  - Figur anklicken → legale Züge werden markiert
-  - Markiertes Zielfeld anklicken, um den Zug auszuführen
-4. **Promotion**: Bei Bauernumwandlung erscheint ein Auswahl-Popup
-5. **Pause/Statistiken**: Über das Menü pausieren oder Rangliste/Spielhistorie öffnen
+#### Grundlagen
+- **Ziel**: Schachmatt setzen oder Patt erzwingen
+- **Züge**: Weiß beginnt, Spieler wechseln ab
+- **Schach**: König ist bedroht – muss aus Schach ziehen
+
+#### Spielablauf
+1. **Neues Spiel starten**: Hauptmenü → "Neues Spiel"
+2. **Spieler einrichten**: Namen eingeben, optional Timer (Minuten pro Spieler)
+3. **Zug machen**:
+   - Figur anklicken → grüne Punkte zeigen legale Züge
+   - Zielfeld anklicken → Zug ausführen
+4. **Spezialzüge**:
+   - **Rochade**: König und Turm bewegen (wenn möglich)
+   - **En Passant**: Bauer schlägt seitlich (unter Bedingungen)
+   - **Promotion**: Bauer erreicht letzte Reihe → Figur wählen
+5. **Spielende**: Schachmatt, Patt oder Zeitüberschreitung
+6. **Extras**: Pause-Menü, Statistiken, Spiel-Replay
+
+#### Timer
+- Läuft automatisch nach Zug
+- Bei Zeitüberschreitung verliert der Spieler
+- Kann im Spiel pausiert werden
+- Wird kein Timer ausgewählt, wird die verstrichene Zeit gestoppt
 
 ## Projektstruktur
 
