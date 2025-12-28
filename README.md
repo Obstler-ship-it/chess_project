@@ -197,10 +197,6 @@ Das Schachbrett wird als JSON-String gespeichert mit folgendem Format:
 - **pytest>=7.0**: Für Unit-Tests
 - **flake8**: Für Code-Style-Überprüfung
 
-## Lizenz
-
-Dieses Projekt ist unter der MIT-Lizenz lizenziert. Siehe [LICENSE](LICENSE) für Details.
-
 ## Technische Details
 
 ### Architektur
@@ -347,4 +343,5 @@ https://commons.wikimedia.org/w/index.php?curid=1499809
 
 ## Lizenz
 
-Dieses Projekt wurde als Hausarbeit des Moduls Programmieren II erstellt.
+Dieses Projekt wurde als Hausarbeit des Moduls **Programmieren II** erstellt.
+Außerdem ist dieses Projekt unter der BSD 3-Clause-Lizenz lizenziert. Siehe [LICENSE](LICENSE) für Details.
