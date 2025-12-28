@@ -344,4 +344,4 @@ https://commons.wikimedia.org/w/index.php?curid=1499809
 ## Lizenz
 
 Dieses Projekt wurde als Hausarbeit des Moduls **Programmieren II** erstellt.
-Außerdem ist dieses Projekt unter der BSD 3-Clause-Lizenz lizenziert. Siehe [LICENSE](LICENSE) für Details.
+Außerdem ist dieses Projekt unter der BSD 3-Clause-Lizenz lizensiert. Siehe [LICENSE](LICENSE) für Details.
