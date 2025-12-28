@@ -336,7 +336,7 @@ Diese Features sind bewusst ausgeschlossen, da der Fokus auf der Implementierung
 Dieses Projekt wurde mit Unterstützung von KI-Assistenten entwickelt:
 
 - **Tests**: Geschrieben von Grok (xAI) – umfassende Unit-Test-Suite mit 47 Tests
-- **UI-Komponenten**: Große Teile der Kivy-Benutzeroberfläche (Screens, Widgets, Popups) entwickelt von Claude Sonnet (Anthropic)
+- **UI-Komponenten**: Große Teile der Kivy-Benutzeroberfläche (Screens, Widgets, Popups) geschrieben von Claude Sonnet (Anthropic)
 
 **Figuren-Grafiken**: By Cburnett - Own work, CC BY-SA 3.0  
 https://commons.wikimedia.org/w/index.php?curid=1499809
