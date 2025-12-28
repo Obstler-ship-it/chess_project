@@ -3,7 +3,7 @@
 import pytest
 import os
 import tempfile
-from database import DatabaseManager
+from chess_project.database import DatabaseManager
 
 
 class TestDatabaseManager:
@@ -204,7 +204,7 @@ class TestDatabaseManager:
         game1_id = temp_db.create_game(white_id, black_id, 'timed')
         game2_id = temp_db.create_game(black_id, white_id, 'untimed')
         
-        games = temp_db.get_all_games(limit=10)
+        games = temp_db.list_games(limit=10)
         
         assert len(games) >= 2
         game_ids = [g['id'] for g in games]

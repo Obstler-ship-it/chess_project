@@ -1,0 +1,1 @@
+"""Chess Project - A Schachspiel implementation with Kivy UI."""

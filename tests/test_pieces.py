@@ -2,9 +2,9 @@
 
 import pytest
 import numpy as np
-from board import Board
-from pieces import King, Queen, Rook, Bishop, Knight, Pawn
-from move import Move
+from chess_project.board import Board
+from chess_project.pieces import King, Queen, Rook, Bishop, Knight, Pawn
+from chess_project.move import Move
 
 
 class TestPawn:
@@ -16,14 +16,14 @@ class TestPawn:
         assert pawn.color == 'white'
         assert pawn.position == (1, 4)
         assert pawn.notation == 'P'
-        assert pawn.is_pawn
+        assert pawn.pawn
     
     def test_pawn_image_path(self):
         """Test: Bildpfad wird korrekt generiert."""
         white_pawn = Pawn('white', (1, 0))
         black_pawn = Pawn('black', (6, 0))
-        assert white_pawn.get_image_path() == 'pieces/white_P.png'
-        assert black_pawn.get_image_path() == 'pieces/black_P.png'
+        assert white_pawn.get_image_path().endswith('white_P.png')
+        assert black_pawn.get_image_path().endswith('black_P.png')
     
     def test_pawn_single_move_forward(self):
         """Test: Bauer kann ein Feld vorwärts ziehen."""
@@ -58,7 +58,7 @@ class TestKnight:
         knight = Knight('white', (0, 1))
         assert knight.color == 'white'
         assert knight.notation == 'N'
-        assert not knight.is_pawn
+        assert not knight.pawn
     
     def test_knight_moves_from_start(self):
         """Test: Springer kann L-förmig ziehen."""
@@ -201,8 +201,11 @@ class TestKing:
         black_rook = Rook('black', (3, 7))
         board.squares[3, 7] = black_rook
         
-        legal_moves = white_king.get_legal_moves(board)
-        move_targets = [move.to_pos for move in legal_moves]
+        from chess_project.chess_logic import ChessLogic
+        logic = ChessLogic(board)
+        legal_moves = logic.all_legal_moves(last_move=None, current_turn='white')
+        king_moves = [move for move in legal_moves if move.piece == white_king]
+        move_targets = [move.to_pos for move in king_moves]
         
         # König darf nicht nach (3, 4) ziehen
         assert (3, 4) not in move_targets

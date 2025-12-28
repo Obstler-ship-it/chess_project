@@ -1,4 +1,4 @@
-# Chess Game
+# Chess Project
 
 Ein voll funktionsfähiges Schachspiel mit grafischer Benutzeroberfläche, entwickelt in Python mit Kivy.
 
@@ -24,37 +24,6 @@ Ein voll funktionsfähiges Schachspiel mit grafischer Benutzeroberfläche, entwi
   - Klare Aufteilung: `game_controller.py` (Steuerung) + `ui/` (Kivy-Screens/Widgets) + `board.py`/`chess_logic.py` (Regeln)
   - Objektorientiertes Design, Type Hints, PEP 8
 
-## Projektstruktur
-
-```
-chess_project/
-│
-├── main.py                  # Python Entry Point
-├── kivy_main.py             # Kivy-App und ScreenManager-Aufbau
-├── game_controller.py       # Spielsteuerung und Navigation
-├── board.py                 # Schachbrett-Logik
-├── chess_logic.py           # Regelvalidierung und Zugprüfung
-├── chess_timer.py           # Timer-Handling für Blitz/rapid
-├── pieces.py                # Spielfiguren (King, Queen, Rook, etc.)
-├── move.py                  # Move-Datenstruktur
-├── database.py              # Datenbank-Management
-├── ui/
-│   ├── board_widgets.py     # ChessBoard/ChessSquare Widgets
-│   ├── popups.py            # Promotion- & Game-Over-Popups
-│   ├── screens.py           # Start/Game/Stats/Replay/Pause Screens
-│   └── __init__.py
-├── pieces/                  # Figuren-Grafiken (PNG) + KIVY_ARCHITECTURE.md
-├── tests/                   # Unit Tests
-│   ├── test_board.py        # Tests für Board-Klasse
-│   ├── test_pieces.py       # Tests für Figuren
-│   ├── test_chess_logic.py  # Tests für Spiellogik
-│   └── test_database.py     # Tests für Datenbank
-├── class_diagram.puml       # UML-Klassendiagramm
-├── sequence_diagram.puml    # UML-Sequenzdiagramm
-├── requirements.txt         # Python Dependencies
-└── README.md
-```
-
 ## Installation
 
 ### Voraussetzungen
@@ -62,7 +31,25 @@ chess_project/
 - Python 3.8 oder höher
 - pip (Python Package Manager)
 
-### Setup
+### Paket-Installation
+
+1. **Repository klonen**
+   ```bash
+   git clone <repository-url>
+   cd chess_project
+   ```
+
+2. **Paket installieren**
+   ```bash
+   pip install .
+   ```
+
+   Oder für Entwicklung:
+   ```bash
+   pip install -e .
+   ```
+
+### Manuelle Installation (für Entwicklung)
 
 1. **Repository klonen**
    ```bash
@@ -98,9 +85,18 @@ chess_project/
 
 ### Spiel starten
 
+Nach der Installation kann das Spiel mit dem Befehl `chess` gestartet werden:
+
 ```bash
-python main.py
+chess
 ```
+
+### Alternative Startmethoden
+
+- **Direkter Python-Aufruf** (nach manueller Installation):
+  ```bash
+  python -m chess_project.main
+  ```
 
 ### Spielanleitung
 
@@ -111,6 +107,83 @@ python main.py
   - Markiertes Zielfeld anklicken, um den Zug auszuführen
 4. **Promotion**: Bei Bauernumwandlung erscheint ein Auswahl-Popup
 5. **Pause/Statistiken**: Über das Menü pausieren oder Rangliste/Spielhistorie öffnen
+
+## Projektstruktur
+
+```
+chess_project/
+│
+├── src/
+│   └── chess_project/
+│       ├── __init__.py
+│       ├── main.py                  # Python Entry Point
+│       ├── kivy_main.py             # Kivy-App und ScreenManager-Aufbau
+│       ├── game_controller.py       # Spielsteuerung und Navigation
+│       ├── board.py                 # Schachbrett-Logik
+│       ├── chess_logic.py           # Regelvalidierung und Zugprüfung
+│       ├── chess_timer.py           # Timer-Handling für Blitz/rapid
+│       ├── pieces.py                # Spielfiguren (King, Queen, Rook, etc.)
+│       ├── move.py                  # Move-Datenstruktur
+│       ├── database.py              # Datenbank-Management
+│       ├── ui/
+│       │   ├── board_widgets.py     # ChessBoard/ChessSquare Widgets
+│       │   ├── popups.py            # Promotion- & Game-Over-Popups
+│       │   ├── screens.py           # Start/Game/Stats/Replay/Pause Screens
+│       │   └── __init__.py
+│       └── pieces/                  # Figuren-Grafiken (PNG) + KIVY_ARCHITECTURE.md
+├── tests/                           # Unit Tests
+│   ├── test_board.py                # Tests für Board-Klasse
+│   ├── test_pieces.py               # Tests für Figuren
+│   ├── test_chess_logic.py          # Tests für Spiellogik
+│   └── test_database.py             # Tests für Datenbank
+├── pyproject.toml                   # Paket-Konfiguration
+├── README.md                        # Diese Datei
+├── LICENSE                          # MIT-Lizenz
+├── class_diagram.puml               # UML-Klassendiagramm
+└── sequence_diagram.puml            # UML-Sequenzdiagramm
+```
+
+## Datenformatspezifikation
+
+### Board-Serialisierung (JSON)
+
+Das Schachbrett wird als JSON-String gespeichert mit folgendem Format:
+
+```json
+[
+  {"row": 0, "col": 0, "image_path": "path/to/piece.png"},
+  {"row": 0, "col": 1, "image_path": null},
+  ...
+  {"turn": "white", "white_time": 600, "black_time": 600, "draw_offers": {"white": false, "black": false}}
+]
+```
+
+- `row`, `col`: Position (0-7)
+- `image_path`: Pfad zur Figur-Grafik oder `null` für leeres Feld
+- `turn`: Aktueller Spieler ("white" oder "black")
+- `white_time`, `black_time`: Verbleibende Zeit in Sekunden
+- `draw_offers`: Remis-Angebote pro Spieler
+
+### Datenbank-Schema
+
+- **players**: `id`, `name`, `created_at`
+- **games**: `id`, `white_player_id`, `black_player_id`, `result`, `start_time`, `end_time`, `use_timer`, `time_per_player`
+- **moves**: `id`, `game_id`, `move_number`, `from_pos`, `to_pos`, `piece`, `captured`, `promotion`, `notation`
+- **boards**: `id`, `game_id`, `board_number`, `board_JSON`, `notation`, `white_time`, `black_time`
+
+## Abhängigkeiten
+
+### Laufzeit-Abhängigkeiten
+- **numpy>=1.24**: Für das Schachbrett-Array
+- **kivy>=2.3.1**: Für die grafische Benutzeroberfläche
+
+### Entwicklungs-Abhängigkeiten
+- **pytest>=7.0**: Für Unit-Tests
+- **flake8**: Für Code-Style-Überprüfung
+
+## Lizenz
+
+Dieses Projekt ist unter der MIT-Lizenz lizenziert. Siehe [LICENSE](LICENSE) für Details.
 
 ## Technische Details
 
@@ -210,22 +283,6 @@ pytest tests/test_chess_logic.py
 pytest tests/test_database.py
 ```
 
-**Mit Coverage-Report (HTML):**
-```bash
-pytest tests/ --cov=. --cov-report=html
-```
-Nach der Ausführung öffnen Sie `htmlcov/index.html` im Browser.
-
-**Mit Coverage-Report (Terminal):**
-```bash
-pytest tests/ --cov=. --cov-report=term-missing
-```
-
-**Nur fehlgeschlagene Tests erneut ausführen:**
-```bash
-pytest tests/ --lf
-```
-
 ### Test-Coverage
 
 Die Tests decken folgende Bereiche ab:
@@ -254,75 +311,6 @@ Die Tests decken folgende Bereiche ab:
   - Spielhistorie
   - Statistiken und Rangliste
 
-## UML-Diagramme
-
-Das Projekt enthält zwei UML-Diagramme im PlantUML-Format zur Dokumentation der Architektur:
-
-### 📐 Klassendiagramm ([class_diagram.puml](class_diagram.puml))
-
-Zeigt die gesamte Systemarchitektur:
-- **Vererbungshierarchie der Figuren**: Basisklasse `Piece` → `King`, `Queen`, `Rook`, `Bishop`, `Knight`, `Pawn`
-- **Hauptklassen**: 
-  - `GameController`: Steuerung des Spielablaufs
-  - `Board`: Repräsentation des Schachbretts (8x8 NumPy Array)
-  - `ChessLogic`: Regelvalidierung und Zugprüfung
-  - `DatabaseManager`: Datenbankzugriff (SQLite)
-- **UI-Komponenten**: 
-  - Screens: `StartScreen`, `GameScreen`, `StatsScreen`, `GameReplayScreen`, `PauseScreen`
-  - Widgets: `ChessBoard`, `ChessSquare`, `PromotionPopup`, `GameOverPopup`
-- **Beziehungen und Abhängigkeiten**: Assoziationen, Kompositionen und Vererbungen
-
-### 🔄 Sequenzdiagramm ([sequence_diagram.puml](sequence_diagram.puml))
-
-Zeigt den detaillierten Ablauf eines Spielzugs:
-1. **Figur-Auswahl**: Spieler klickt auf eine Figur
-2. **Zugvalidierung**: ChessLogic prüft legale Züge
-3. **Zugausführung**: Board führt Zug aus (inkl. Spezialzüge wie Rochade, En Passant, Promotion)
-4. **Board-Aktualisierung**: GUI wird aktualisiert
-5. **Datenbankpersistenz**: Zug wird in Datenbank gespeichert
-6. **Spielende-Prüfung**: Prüfung auf Schachmatt/Patt
-
-### 🖼️ Diagramme anzeigen
-
-Die `.puml`-Dateien können mit folgenden Tools gerendert werden:
-
-**Online (einfachste Methode):**
-- [PlantUML Web Server](http://www.plantuml.com/plantuml/uml/) - Datei hochladen oder Code kopieren
-
-**VS Code:**
-- Extension installieren: "PlantUML" von jebbs
-- Rechtsklick auf `.puml` Datei → "Preview Current Diagram"
-- Oder: `Ctrl+Shift+P` → "PlantUML: Preview Current Diagram"
-
-**IntelliJ IDEA / PyCharm:**
-- Plugin installieren: "PlantUML Integration"
-- `.puml` Datei öffnen → Vorschau erscheint automatisch
-
-**Kommandozeile:**
-```bash
-# PlantUML installieren (benötigt Java)
-# Debian/Ubuntu:
-sudo apt-get install plantuml
-
-# macOS:
-brew install plantuml
-
-# Windows: Download von https://plantuml.com/download
-
-# Diagramm generieren (PNG):
-plantuml class_diagram.puml
-plantuml sequence_diagram.puml
-
-# Diagramm generieren (SVG, bessere Qualität):
-plantuml -tsvg class_diagram.puml
-```
-
-## Tests
-
-```bash
-pytest tests/
-```
-
 ## Bekannte Einschränkungen / Nicht implementiert
 
 - ⚠️ **Keine KI-Engine** (nur 2-Spieler-Modus)
@@ -333,9 +321,14 @@ Diese Features sind bewusst ausgeschlossen, da der Fokus auf der Implementierung
 
 ## Credits
 
+Dieses Projekt wurde mit Unterstützung von KI-Assistenten entwickelt:
+
+- **Tests**: Geschrieben von Grok (xAI) – umfassende Unit-Test-Suite mit 47 Tests
+- **UI-Komponenten**: Große Teile der Kivy-Benutzeroberfläche (Screens, Widgets, Popups) entwickelt von Claude Sonnet (Anthropic)
+
 **Figuren-Grafiken**: By Cburnett - Own work, CC BY-SA 3.0  
 https://commons.wikimedia.org/w/index.php?curid=1499809
 
 ## Lizenz
 
-Dieses Projekt wurde zu Bildungszwecken erstellt.
+Dieses Projekt wurde als Hausarbeit des Moduls Programmieren II erstellt.
