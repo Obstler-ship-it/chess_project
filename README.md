@@ -197,10 +197,6 @@ Das Schachbrett wird als JSON-String gespeichert mit folgendem Format:
 - **pytest>=7.0**: Für Unit-Tests
 - **flake8**: Für Code-Style-Überprüfung
 
-## Lizenz
-
-Dieses Projekt ist unter der MIT-Lizenz lizenziert. Siehe [LICENSE](LICENSE) für Details.
-
 ## Technische Details
 
 ### Architektur
@@ -340,11 +336,12 @@ Diese Features sind bewusst ausgeschlossen, da der Fokus auf der Implementierung
 Dieses Projekt wurde mit Unterstützung von KI-Assistenten entwickelt:
 
 - **Tests**: Geschrieben von Grok (xAI) – umfassende Unit-Test-Suite mit 47 Tests
-- **UI-Komponenten**: Große Teile der Kivy-Benutzeroberfläche (Screens, Widgets, Popups) entwickelt von Claude Sonnet (Anthropic)
+- **UI-Komponenten**: Große Teile der Kivy-Benutzeroberfläche (Screens, Widgets, Popups) geschrieben von Claude Sonnet (Anthropic)
 
 **Figuren-Grafiken**: By Cburnett - Own work, CC BY-SA 3.0  
 https://commons.wikimedia.org/w/index.php?curid=1499809
 
 ## Lizenz
 
-Dieses Projekt wurde als Hausarbeit des Moduls Programmieren II erstellt.
+Dieses Projekt wurde als Hausarbeit des Moduls **Programmieren II** erstellt.
+Außerdem ist dieses Projekt unter der BSD 3-Clause-Lizenz lizensiert. Siehe [LICENSE](LICENSE) für Details.
