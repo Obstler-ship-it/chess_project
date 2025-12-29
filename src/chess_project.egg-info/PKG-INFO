@@ -4,27 +4,31 @@ Version: 1.0.0
 Summary: A Schachspiel implementation with Kivy UI
 Author-email: Your Name <your.email@example.com>
 Maintainer-email: Your Name <your.email@example.com>
-License: MIT License
+License: Copyright (c) 2026, Felix Probstfeld
+        All rights reserved.
         
-        Copyright (c) 2025 Your Name
+        Redistribution and use in source and binary forms, with or without
+        modification, are permitted provided that the following conditions are met:
         
-        Permission is hereby granted, free of charge, to any person obtaining a copy
-        of this software and associated documentation files (the "Software"), to deal
-        in the Software without restriction, including without limitation the rights
-        to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-        copies of the Software, and to permit persons to whom the Software is
-        furnished to do so, subject to the following conditions:
+        1. Redistributions of source code must retain the above copyright notice, this
+           list of conditions and the following disclaimer.
+        2. Redistributions in binary form must reproduce the above copyright notice,
+           this list of conditions and the following disclaimer in the documentation
+           and/or other materials provided with the distribution.
+        3. Neither the name of the copyright holder nor the names of its
+           contributors may be used to endorse or promote products derived from
+           this software without specific prior written permission.
         
-        The above copyright notice and this permission notice shall be included in all
-        copies or substantial portions of the Software.
-        
-        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-        AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-        LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-        OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-        SOFTWARE.
+        THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+        AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+        IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+        DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+        FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+        DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+        SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+        CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+        OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+        OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 Keywords: chess,game,kivy,schach
 Classifier: Development Status :: 4 - Beta
 Classifier: Intended Audience :: End Users/Desktop
@@ -152,13 +156,29 @@ chess
 
 ### Spielanleitung
 
-1. **Neues Spiel**: "Neues Spiel" im Hauptmenü wählen
-2. **Spieler wählen**: Namen für Weiß/Schwarz eingeben; optional Timer aktivieren (Minuten pro Spieler)
-3. **Zug ausführen**:
-  - Figur anklicken → legale Züge werden markiert
-  - Markiertes Zielfeld anklicken, um den Zug auszuführen
-4. **Promotion**: Bei Bauernumwandlung erscheint ein Auswahl-Popup
-5. **Pause/Statistiken**: Über das Menü pausieren oder Rangliste/Spielhistorie öffnen
+#### Grundlagen
+- **Ziel**: Schachmatt setzen oder Patt erzwingen
+- **Züge**: Weiß beginnt, Spieler wechseln ab
+- **Schach**: König ist bedroht – muss aus Schach ziehen
+
+#### Spielablauf
+1. **Neues Spiel starten**: Hauptmenü → "Neues Spiel"
+2. **Spieler einrichten**: Namen eingeben, optional Timer (Minuten pro Spieler)
+3. **Zug machen**:
+   - Figur anklicken → grüne Punkte zeigen legale Züge
+   - Zielfeld anklicken → Zug ausführen
+4. **Spezialzüge**:
+   - **Rochade**: König und Turm bewegen (wenn möglich)
+   - **En Passant**: Bauer schlägt seitlich (unter Bedingungen)
+   - **Promotion**: Bauer erreicht letzte Reihe → Figur wählen
+5. **Spielende**: Schachmatt, Patt oder Zeitüberschreitung
+6. **Extras**: Pause-Menü, Statistiken, Spiel-Replay
+
+#### Timer
+- Läuft automatisch nach Zug
+- Bei Zeitüberschreitung verliert der Spieler
+- Kann im Spiel pausiert werden
+- Wird kein Timer ausgewählt, wird die verstrichene Zeit gestoppt
 
 ## Projektstruktur
 
@@ -190,7 +210,7 @@ chess_project/
 │   └── test_database.py             # Tests für Datenbank
 ├── pyproject.toml                   # Paket-Konfiguration
 ├── README.md                        # Diese Datei
-├── LICENSE                          # MIT-Lizenz
+├── LICENSE                          # BSD-Lizenz
 ├── class_diagram.puml               # UML-Klassendiagramm
 └── sequence_diagram.puml            # UML-Sequenzdiagramm
 ```
@@ -235,7 +255,7 @@ Das Schachbrett wird als JSON-String gespeichert mit folgendem Format:
 
 ## Lizenz
 
-Dieses Projekt ist unter der MIT-Lizenz lizenziert. Siehe [LICENSE](LICENSE) für Details.
+Dieses Projekt ist unter der BSD 3-Clause-Lizenz lizenziert. Siehe [LICENSE](LICENSE) für Details.
 
 ## Technische Details
 
@@ -335,22 +355,6 @@ pytest tests/test_chess_logic.py
 pytest tests/test_database.py
 ```
 
-**Mit Coverage-Report (HTML):**
-```bash
-pytest tests/ --cov=. --cov-report=html
-```
-Nach der Ausführung öffnen Sie `htmlcov/index.html` im Browser.
-
-**Mit Coverage-Report (Terminal):**
-```bash
-pytest tests/ --cov=. --cov-report=term-missing
-```
-
-**Nur fehlgeschlagene Tests erneut ausführen:**
-```bash
-pytest tests/ --lf
-```
-
 ### Test-Coverage
 
 Die Tests decken folgende Bereiche ab:
@@ -379,75 +383,6 @@ Die Tests decken folgende Bereiche ab:
   - Spielhistorie
   - Statistiken und Rangliste
 
-## UML-Diagramme
-
-Das Projekt enthält zwei UML-Diagramme im PlantUML-Format zur Dokumentation der Architektur:
-
-### 📐 Klassendiagramm ([class_diagram.puml](class_diagram.puml))
-
-Zeigt die gesamte Systemarchitektur:
-- **Vererbungshierarchie der Figuren**: Basisklasse `Piece` → `King`, `Queen`, `Rook`, `Bishop`, `Knight`, `Pawn`
-- **Hauptklassen**: 
-  - `GameController`: Steuerung des Spielablaufs
-  - `Board`: Repräsentation des Schachbretts (8x8 NumPy Array)
-  - `ChessLogic`: Regelvalidierung und Zugprüfung
-  - `DatabaseManager`: Datenbankzugriff (SQLite)
-- **UI-Komponenten**: 
-  - Screens: `StartScreen`, `GameScreen`, `StatsScreen`, `GameReplayScreen`, `PauseScreen`
-  - Widgets: `ChessBoard`, `ChessSquare`, `PromotionPopup`, `GameOverPopup`
-- **Beziehungen und Abhängigkeiten**: Assoziationen, Kompositionen und Vererbungen
-
-### 🔄 Sequenzdiagramm ([sequence_diagram.puml](sequence_diagram.puml))
-
-Zeigt den detaillierten Ablauf eines Spielzugs:
-1. **Figur-Auswahl**: Spieler klickt auf eine Figur
-2. **Zugvalidierung**: ChessLogic prüft legale Züge
-3. **Zugausführung**: Board führt Zug aus (inkl. Spezialzüge wie Rochade, En Passant, Promotion)
-4. **Board-Aktualisierung**: GUI wird aktualisiert
-5. **Datenbankpersistenz**: Zug wird in Datenbank gespeichert
-6. **Spielende-Prüfung**: Prüfung auf Schachmatt/Patt
-
-### 🖼️ Diagramme anzeigen
-
-Die `.puml`-Dateien können mit folgenden Tools gerendert werden:
-
-**Online (einfachste Methode):**
-- [PlantUML Web Server](http://www.plantuml.com/plantuml/uml/) - Datei hochladen oder Code kopieren
-
-**VS Code:**
-- Extension installieren: "PlantUML" von jebbs
-- Rechtsklick auf `.puml` Datei → "Preview Current Diagram"
-- Oder: `Ctrl+Shift+P` → "PlantUML: Preview Current Diagram"
-
-**IntelliJ IDEA / PyCharm:**
-- Plugin installieren: "PlantUML Integration"
-- `.puml` Datei öffnen → Vorschau erscheint automatisch
-
-**Kommandozeile:**
-```bash
-# PlantUML installieren (benötigt Java)
-# Debian/Ubuntu:
-sudo apt-get install plantuml
-
-# macOS:
-brew install plantuml
-
-# Windows: Download von https://plantuml.com/download
-
-# Diagramm generieren (PNG):
-plantuml class_diagram.puml
-plantuml sequence_diagram.puml
-
-# Diagramm generieren (SVG, bessere Qualität):
-plantuml -tsvg class_diagram.puml
-```
-
-## Tests
-
-```bash
-pytest tests/
-```
-
 ## Bekannte Einschränkungen / Nicht implementiert
 
 - ⚠️ **Keine KI-Engine** (nur 2-Spieler-Modus)
@@ -458,9 +393,10 @@ Diese Features sind bewusst ausgeschlossen, da der Fokus auf der Implementierung
 
 ## Credits
 
+Dieses Projekt wurde mit Unterstützung von KI-Assistenten entwickelt:
+
+- **Tests**: Geschrieben von Grok (xAI) – umfassende Unit-Test-Suite mit 47 Tests
+- **UI-Komponenten**: Große Teile der Kivy-Benutzeroberfläche (Screens, Widgets, Popups) geschrieben von Claude Sonnet (Anthropic)
+
 **Figuren-Grafiken**: By Cburnett - Own work, CC BY-SA 3.0  
 https://commons.wikimedia.org/w/index.php?curid=1499809
-
-## Lizenz
-
-Dieses Projekt wurde zu Bildungszwecken erstellt.

@@ -1,6 +1,9 @@
+﻿
+
 """Kivy Screens für Menüs, Spiel und Replays."""
 
 from kivy.app import App
+from kivy.clock import Clock
 from kivy.core.window import Window
 from kivy.graphics import Color, Rectangle
 from kivy.metrics import dp
@@ -10,6 +13,7 @@ from kivy.uix.gridlayout import GridLayout
 from kivy.uix.label import Label
 from kivy.uix.popup import Popup
 from kivy.uix.screenmanager import Screen
+from kivy.uix.modalview import ModalView
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.textinput import TextInput
 from kivy.uix.widget import Widget
@@ -224,116 +228,220 @@ class PlayerSelectionScreen(ScreenBackgroundMixin, PanelMixin, Screen):
         super().__init__(**kwargs)
         self.controller = controller
 
+        # Background
         with self.canvas.before:
             Color(0.1, 0.12, 0.18, 1)
             self.bg_rect = Rectangle(pos=self.pos, size=self.size)
         self.bind(pos=self.update_bg, size=self.update_bg)
 
-        main_layout = BoxLayout(orientation="vertical", padding=[120, 60, 120, 60], spacing=20)
+        # Main Layout
+        main_layout = BoxLayout(orientation="vertical", padding=[150, 50, 150, 80], spacing=20)
+        
+        # Title Box (außerhalb des Panels)
+        title_box = BoxLayout(orientation="vertical", size_hint=(1, None), height=60, padding=[0, 0, 0, 5])
+        title = Label(text="SPIELER-ANMELDUNG", font_size="48sp", size_hint=(1, 1), bold=True, color=(0.95, 0.95, 1, 1))
+        title_box.add_widget(title)
+        main_layout.add_widget(title_box)
+
+        # Separator (außerhalb des Panels)
+        separator_container = BoxLayout(size_hint=(1, None), height=8)
+        separator = Widget(size_hint=(1, None), height=2)
+        with separator.canvas:
+            Color(0.4, 0.4, 0.5, 1)
+            self.sep_rect = Rectangle()
+        separator.bind(pos=self._update_separator, size=self._update_separator)
+        separator_container.add_widget(separator)
+        main_layout.add_widget(separator_container)
+        
+        # Panel (ohne Title und Separator)
         panel = BoxLayout(orientation="vertical", spacing=20)
+
         with panel.canvas.before:
             Color(0.15, 0.17, 0.22, 0.95)
             self.panel_rect = Rectangle()
         panel.bind(pos=self._update_panel, size=self._update_panel)
 
-        title_box = BoxLayout(orientation="vertical", size_hint=(1, 0.15), padding=[0, 15, 0, 5])
-        title = Label(text="SPIELER-ANMELDUNG", font_size="38sp", size_hint=(1, 0.6), bold=True, color=(0.95, 0.95, 1, 1))
-        title_box.add_widget(title)
+        # Content Container
+        content_container = BoxLayout(orientation="vertical", spacing=15, size_hint=(1, 0.75), padding=[80, 20, 80, 20])
 
-        info_label = Label(text="Benutzernamen eingeben oder neuen Account erstellen", font_size="14sp", size_hint=(1, 0.4), color=(0.7, 0.75, 0.85, 1))
-        title_box.add_widget(info_label)
-        panel.add_widget(title_box)
-
-        separator = Widget(size_hint=(1, 0.02))
-        with separator.canvas:
-            Color(0.4, 0.4, 0.5, 1)
-            self.sep_rect = Rectangle()
-        separator.bind(pos=self._update_separator, size=self._update_separator)
-        panel.add_widget(separator)
-
-        players_container = BoxLayout(orientation="horizontal", spacing=25, size_hint=(1, 0.38), padding=[50, 20, 50, 20])
-
-        white_box = BoxLayout(orientation="vertical", spacing=15)
-        white_label = Label(text="WEISS", font_size="22sp", size_hint=(1, None), height=35, bold=True, color=(1, 1, 1, 1))
+        # Spieler Eingaben - Horizontal Layout
+        from kivy.uix.relativelayout import RelativeLayout
+        players_layout = BoxLayout(orientation="horizontal", spacing=40, size_hint=(1, 0.5))
+        
+        # Weiß Spieler
+        white_container = RelativeLayout(size_hint=(0.5, 1))
+        white_box = BoxLayout(orientation="vertical", spacing=10, size_hint=(1, None), height=100, pos_hint={'top': 1})
+        
+        white_label = Label(
+            text="WEISS", 
+            font_size="24sp", 
+            size_hint=(1, None), 
+            height=35, 
+            bold=True, 
+            color=(1, 1, 1, 1)
+        )
         white_box.add_widget(white_label)
-
-        self.white_input = TextInput(hint_text="Benutzername", multiline=False, size_hint=(1, None), height=50, font_size="20sp", write_tab=False, text_validate_unfocus=False, background_color=(0.22, 0.24, 0.28, 1), foreground_color=(1, 1, 1, 1), padding=[15, 12])
-        self.white_input.bind(text=lambda instance, value: self.limit_name_length(instance, value, 20))  # type: ignore
+        
+        self.white_input = TextInput(
+            hint_text="Benutzername", 
+            multiline=False, 
+            size_hint=(1, None), 
+            height=55, 
+            font_size="22sp", 
+            write_tab=False,
+            background_color=(0.22, 0.24, 0.28, 1), 
+            foreground_color=(1, 1, 1, 1), 
+            padding=[15, 15]
+        )
+        self.white_input.bind(text=lambda instance, value: self.limit_name_length(instance, value, 10))
+        self.white_input.bind(text=self.on_white_text_change)
         white_box.add_widget(self.white_input)
-        white_box.add_widget(Widget(size_hint=(1, 1)))
-        players_container.add_widget(white_box)
-
-        vsep = Widget(size_hint=(None, 1), width=1)
-        with vsep.canvas:
-            Color(0.35, 0.37, 0.42, 1)
-            self.vsep_rect = Rectangle()
-        vsep.bind(pos=self._update_vsep, size=self._update_vsep)
-        players_container.add_widget(vsep)
-
-        black_box = BoxLayout(orientation="vertical", spacing=15)
-        black_label = Label(text="SCHWARZ", font_size="22sp", size_hint=(1, None), height=35, bold=True, color=(0.85, 0.85, 0.85, 1))
+        white_container.add_widget(white_box)
+        
+        # Dropdown für Weiß
+        self.white_scroll = ScrollView(
+            size_hint=(1, None), 
+            height=0, 
+            do_scroll_x=False,
+            pos_hint={'top': 0.38}
+        )
+        self.white_list = BoxLayout(orientation="vertical", size_hint_y=None, spacing=2, padding=5)
+        self.white_list.bind(minimum_height=self.white_list.setter('height'))
+        self.white_scroll.add_widget(self.white_list)
+        white_container.add_widget(self.white_scroll)
+        
+        players_layout.add_widget(white_container)
+        
+        # Schwarz Spieler
+        black_container = RelativeLayout(size_hint=(0.5, 1))
+        black_box = BoxLayout(orientation="vertical", spacing=10, size_hint=(1, None), height=100, pos_hint={'top': 1})
+        
+        black_label = Label(
+            text="SCHWARZ", 
+            font_size="24sp", 
+            size_hint=(1, None), 
+            height=35, 
+            bold=True, 
+            color=(0.85, 0.85, 0.85, 1)
+        )
         black_box.add_widget(black_label)
-
-        self.black_input = TextInput(hint_text="Benutzername", multiline=False, size_hint=(1, None), height=50, font_size="20sp", write_tab=False, text_validate_unfocus=False, background_color=(0.22, 0.24, 0.28, 1), foreground_color=(1, 1, 1, 1), padding=[15, 12])
-        self.black_input.bind(text=lambda instance, value: self.limit_name_length(instance, value, 20))  # type: ignore
+        
+        self.black_input = TextInput(
+            hint_text="Benutzername", 
+            multiline=False, 
+            size_hint=(1, None), 
+            height=55, 
+            font_size="22sp", 
+            write_tab=False,
+            background_color=(0.22, 0.24, 0.28, 1), 
+            foreground_color=(1, 1, 1, 1), 
+            padding=[15, 15]
+        )
+        self.black_input.bind(text=lambda instance, value: self.limit_name_length(instance, value, 20))
+        self.black_input.bind(text=self.on_black_text_change)
         black_box.add_widget(self.black_input)
-        black_box.add_widget(Widget(size_hint=(1, 1)))
-        players_container.add_widget(black_box)
+        black_container.add_widget(black_box)
+        
+        # Dropdown für Schwarz
+        self.black_scroll = ScrollView(
+            size_hint=(1, None), 
+            height=0, 
+            do_scroll_x=False,
+            pos_hint={'top': 0.38}
+        )
+        self.black_list = BoxLayout(orientation="vertical", size_hint_y=None, spacing=2, padding=5)
+        self.black_list.bind(minimum_height=self.black_list.setter('height'))
+        self.black_scroll.add_widget(self.black_list)
+        black_container.add_widget(self.black_scroll)
+        
+        players_layout.add_widget(black_container)
+        
+        content_container.add_widget(players_layout)
 
-        panel.add_widget(players_container)
-
-        timer_sep = Widget(size_hint=(1, None), height=1)
-        with timer_sep.canvas:
-            Color(0.3, 0.32, 0.37, 1)
-            self.timer_sep_rect = Rectangle()
-        timer_sep.bind(pos=self._update_timer_sep, size=self._update_timer_sep)
-        panel.add_widget(timer_sep)
-
-        timer_box = BoxLayout(orientation="vertical", spacing=0, size_hint=(1, 0.22), padding=[50, 15, 50, 10])
-
-        timer_title = Label(text="TIMER-EINSTELLUNGEN", font_size="16sp", size_hint=(1, None), height=25, bold=True, color=(0.75, 0.8, 0.9, 1))
-        timer_box.add_widget(timer_title)
-
-        timer_box.add_widget(Widget(size_hint=(1, None), height=10))
-
-        timer_container = BoxLayout(orientation="horizontal", spacing=20, size_hint=(1, None), height=45)
-        timer_container.add_widget(Widget(size_hint=(0.05, 1)))
-
+        # Timer Einstellungen
         from kivy.uix.checkbox import CheckBox
-
-        self.timer_checkbox = CheckBox(size_hint=(None, None), size=(28, 28), active=False)
+        timer_section = BoxLayout(orientation="vertical", spacing=12, size_hint=(1, 0.25), padding=[0, 25, 0, 0])
+        
+        timer_controls = BoxLayout(orientation="horizontal", spacing=20, size_hint=(1, None), height=55)
+        timer_controls.add_widget(Widget(size_hint=(0.15, 1)))
+        
+        self.timer_checkbox = CheckBox(size_hint=(None, None), size=(40, 40), active=False)
         self.timer_checkbox.bind(active=self.toggle_timer_input)
-        timer_container.add_widget(self.timer_checkbox)
+        timer_controls.add_widget(self.timer_checkbox)
+        
+        timer_label = Label(
+            text="Timer aktivieren", 
+            size_hint=(None, 1), 
+            width=180, 
+            font_size="20sp", 
+            bold=True, 
+            color=(0.9, 0.92, 1, 1)
+        )
+        timer_controls.add_widget(timer_label)
+        timer_controls.add_widget(Widget(size_hint=(1, 1)))
+        
+        self.time_input = TextInput(
+            text="10", 
+            multiline=False, 
+            size_hint=(None, None), 
+            size=(90, 50), 
+            font_size="22sp", 
+            input_filter="int", 
+            disabled=True,
+            background_color=(0.22, 0.24, 0.28, 1), 
+            foreground_color=(1, 1, 1, 1), 
+            padding=[15, 12], 
+            halign="center"
+        )
+        self.time_input.bind(text=lambda instance, value: self.limit_name_length(instance, value, 2))
+        timer_controls.add_widget(self.time_input)
+        
+        time_label = Label(
+            text="Minuten", 
+            size_hint=(None, 1), 
+            width=100, 
+            font_size="19sp", 
+            color=(0.75, 0.78, 0.88, 1)
+        )
+        timer_controls.add_widget(time_label)
+        timer_controls.add_widget(Widget(size_hint=(0.15, 1)))
+        
+        timer_section.add_widget(timer_controls)
+        content_container.add_widget(timer_section)
 
-        timer_label = Label(text="Timer aktivieren", size_hint=(None, 1), width=140, font_size="17sp", bold=True, color=(0.9, 0.92, 1, 1), halign="left")
-        timer_label.bind(size=lambda l, s: setattr(l, "text_size", (s[0], None)))
-        timer_container.add_widget(timer_label)
+        panel.add_widget(content_container)
 
-        timer_container.add_widget(Widget(size_hint=(1, 1)))
-
-        self.time_input = TextInput(text="10", multiline=False, size_hint=(None, None), size=(70, 38), font_size="18sp", input_filter="int", disabled=True, background_color=(0.22, 0.24, 0.28, 1), foreground_color=(1, 1, 1, 1), padding=[12, 8], halign="center")
-        self.time_input.bind(text=lambda instance, value: self.limit_name_length(instance, value, 2))  # type: ignore
-        timer_container.add_widget(self.time_input)
-
-        time_info = Label(text="Minuten", size_hint=(None, 1), width=80, font_size="16sp", color=(0.75, 0.78, 0.88, 1))
-        timer_container.add_widget(time_info)
-
-        timer_container.add_widget(Widget(size_hint=(0.05, 1)))
-
-        timer_box.add_widget(timer_container)
-        panel.add_widget(timer_box)
-
-        button_bar = BoxLayout(orientation="horizontal", spacing=25, size_hint=(1, 0.13), padding=[50, 15, 50, 15])
-        back_btn = Button(text="Zurück", font_size="22sp", bold=True, background_color=(0.55, 0.3, 0.3, 1), size_hint=(0.4, 1))
+        # Button Bar
+        button_bar = BoxLayout(orientation="horizontal", spacing=20, size_hint=(1, 0.25), padding=[80, 15, 80, 15])
+        
+        back_btn = Button(
+            text="Zurück", 
+            font_size="26sp", 
+            bold=True, 
+            background_color=(0.7, 0.2, 0.2, 1), 
+            size_hint=(0.5, 1)
+        )
         back_btn.bind(on_press=self.go_back)
         button_bar.add_widget(back_btn)
-        start_btn = Button(text="Spiel starten", font_size="22sp", bold=True, background_color=(0.2, 0.65, 0.3, 1), size_hint=(0.6, 1))
+        
+        start_btn = Button(
+            text="Spiel starten", 
+            font_size="26sp", 
+            bold=True, 
+            background_color=(0.2, 0.7, 0.3, 1), 
+            size_hint=(0.5, 1)
+        )
         start_btn.bind(on_press=self.start_game)
         button_bar.add_widget(start_btn)
+        
         panel.add_widget(button_bar)
 
         main_layout.add_widget(panel)
         self.add_widget(main_layout)
+        
+        # Dropdown-Zustände initialisieren
+        self.white_dropdown_open = False
+        self.black_dropdown_open = False
 
     def limit_name_length(self, instance, value, max_length):
         if len(value) > max_length:
@@ -341,16 +449,78 @@ class PlayerSelectionScreen(ScreenBackgroundMixin, PanelMixin, Screen):
 
     def toggle_timer_input(self, checkbox, value):
         self.time_input.disabled = not value
-
-    def _update_vsep(self, instance, value):
-        margin = instance.height * 0.1
-        self.vsep_rect.pos = (instance.x, instance.y + margin)
-        self.vsep_rect.size = (instance.width, instance.height * 0.8)
-
-    def _update_timer_sep(self, instance, value):
-        margin = instance.width * 0.1
-        self.timer_sep_rect.pos = (instance.x + margin, instance.y)
-        self.timer_sep_rect.size = (instance.width * 0.8, instance.height)
+    
+    def on_white_text_change(self, instance, value):
+        """Zeigt/versteckt die Dropdown-Liste für weiße Spieler."""
+        if value:
+            self.populate_white_list(value)
+            self.white_scroll.height = 120
+            self.white_dropdown_open = True
+        else:
+            self.white_scroll.height = 0
+            self.white_dropdown_open = False
+    
+    def on_black_text_change(self, instance, value):
+        """Zeigt/versteckt die Dropdown-Liste für schwarze Spieler."""
+        if value:
+            self.populate_black_list(value)
+            self.black_scroll.height = 120
+            self.black_dropdown_open = True
+        else:
+            self.black_scroll.height = 0
+            self.black_dropdown_open = False
+    
+    def populate_white_list(self, filter_text=""):
+        """Füllt die weiße Spielerliste, optional gefiltert."""
+        if not self.controller:
+            return
+        self.white_list.clear_widgets()
+        players = self.controller.get_all_players()
+        filtered = [p for p in players if filter_text.lower() in p['username'].lower()][:10]
+        for player in filtered:
+            btn = Button(
+                text=player['username'],
+                size_hint_y=None,
+                height=35,
+                background_normal='',
+                background_color=(0.28, 0.38, 0.48, 1),
+                color=(1, 1, 1, 1),
+                font_size="17sp"
+            )
+            btn.bind(on_press=lambda btn, name=player['username']: self.select_white_player(name))
+            self.white_list.add_widget(btn)
+    
+    def populate_black_list(self, filter_text=""):
+        """Füllt die schwarze Spielerliste, optional gefiltert."""
+        if not self.controller:
+            return
+        self.black_list.clear_widgets()
+        players = self.controller.get_all_players()
+        filtered = [p for p in players if filter_text.lower() in p['username'].lower()][:10]
+        for player in filtered:
+            btn = Button(
+                text=player['username'],
+                size_hint_y=None,
+                height=35,
+                background_normal='',
+                background_color=(0.28, 0.38, 0.48, 1),
+                color=(1, 1, 1, 1),
+                font_size="17sp"
+            )
+            btn.bind(on_press=lambda btn, name=player['username']: self.select_black_player(name))
+            self.black_list.add_widget(btn)
+    
+    def select_white_player(self, name):
+        """Wählt einen Spieler für Weiß aus der Liste aus."""
+        self.white_input.text = name
+        self.white_scroll.height = 0
+        self.white_dropdown_open = False
+    
+    def select_black_player(self, name):
+        """Wählt einen Spieler für Schwarz aus der Liste aus."""
+        self.black_input.text = name
+        self.black_scroll.height = 0
+        self.black_dropdown_open = False
 
     def _get_or_create_player(self, username: str):
         if self.controller:
@@ -423,6 +593,8 @@ class PlayerSelectionScreen(ScreenBackgroundMixin, PanelMixin, Screen):
         popup = Popup(title=title, content=popup_layout, size_hint=(0.6, 0.4), auto_dismiss=True)
         close_btn.bind(on_press=popup.dismiss)
         popup.open()
+
+
 
 
 class GameScreen(Screen):
@@ -1400,6 +1572,11 @@ class GameReplayScreen(ScreenBackgroundMixin, Screen):
 
                 # Remis-Angebot aktualisieren
                 draw_offers = metadata.get('draw_offers', {})
+                
+                # Wenn Spiel Remis (vereinbart) ist und wir am letzten Board, setze beide auf True
+                if self.game_data and self.game_data.get('result') == 'draw' and self.game_data.get('final_position') == 'Remis' and self.current_move_index == len(self.boards) - 1:
+                    draw_offers = {"white": True, "black": True}
+                
                 if draw_offers and (draw_offers.get('white') or draw_offers.get('black')):
                     # Zeige Remis-Angebot an
                     if draw_offers.get('white') and draw_offers.get('black'):

@@ -20,6 +20,7 @@ from .chess_logic import ChessLogic
 from .move import Move
 from .chess_timer import ChessTimer
 from .database import DatabaseManager
+import json
 
 
 class GameController:
@@ -494,10 +495,7 @@ class GameController:
         Args:
             move: Move-Objekt mit allen Zug-Informationen
         """
-        try:
-            if not self.board:
-                return  # Board nicht initialisiert, nichts tun
-            
+        try:       
             # Zug im Board ausführen
             self.board.make_move(move)
             
@@ -512,17 +510,6 @@ class GameController:
 
             # Auswahl aufheben
             self._deselect_piece()
-            
-            # Gültige Züge für nächsten Spieler berechnen (VOR UI-Update, damit checkmate korrekt ist)
-            self._update_valid_moves()
-            
-            # UI aktualisieren
-            if self.board_widget:
-                self.board_widget.update_board(self.board.squares, self.checkmate)
-            
-            # Timer umschalten
-            if self.timer:
-                self.timer.switch_player()
 
             # DB aktualisieren
             if self.current_game_id:
@@ -534,13 +521,25 @@ class GameController:
                     white_time=str(self.timer.white_time) if self.timer else "0",
                     black_time=str(self.timer.black_time) if self.timer else "0"
                 )
-            
+
             # Remis-Angebot zurücksetzen
             self.draw_offer = False
+            
+            # Gültige Züge für nächsten Spieler berechnen
+            self._update_valid_moves()
+            
+            # UI aktualisieren
+            if self.board_widget:
+                self.board_widget.update_board(self.board.squares, self.checkmate)
+
+            # Timer umschalten
+            if self.timer:
+                self.timer.switch_player()
 
             if self.game_screen:
                 self.game_screen.update_turn_info(self.current_turn)
                 self.game_screen.update_move_history(self.move_history)
+
         except Exception as e:
             self._handle_game_error(e, "bei der Zugvervollständigung")
 
@@ -607,6 +606,9 @@ class GameController:
         if self.game_is_over:
             return  # Kein Remis nach Spielende möglich
         
+        if self.timer:
+            self.timer.pause()
+
         if self.game_screen:
             self.game_screen.show_draw_confirm_popup()
             self.draw_offer = True
@@ -616,29 +618,19 @@ class GameController:
         Wird aufgerufen wenn Remis im Popup bestätigt wurde.
         Beendet das Spiel mit Remis-Ergebnis.
         """
-        if self.game_is_over:
-            return
-        
-        # Speichere finalen Board-Zustand mit akzeptiertem Remis
-        # (beide Spieler haben zugestimmt)
-        if self.current_game_id:
-            # Setze draw_offer auf True für BEIDE Spieler, um zu zeigen dass es akzeptiert wurde
-            old_draw_offer = self.draw_offer
-            self.draw_offer = True  # Temporär für Serialisierung
-            
-            self.db.add_board(
-                game_id=self.current_game_id,
-                board_number=len(self.move_history) + 1,
-                board_JSON=self._serialize_board_with_accepted_draw(),
-                notation="Remis akzeptiert",
-                white_time=str(self.timer.white_time) if self.timer else "0",
-                black_time=str(self.timer.black_time) if self.timer else "0"
-            )
-            
-            self.draw_offer = old_draw_offer
-        
+
         # Spiel als beendet markieren
         self.game_over('remis', None)
+    
+    def cancel_draw(self):
+        """
+        Wird aufgerufen wenn Remis im Popup abgebrochen wurde.
+        Setzt das Remis-Angebot zurück.
+        """
+
+        # Lässt den Timer weiter laufen
+        if self.timer and self.timer.is_paused:
+            self.timer.resume()
     
     # ==================== Hilfsmethoden ====================
 
@@ -742,7 +734,6 @@ class GameController:
         if not self.board:
             return ""
         
-        import json
         board_data = []
         
         for row in range(8):
@@ -764,39 +755,6 @@ class GameController:
 
         return json.dumps(board_data)
     
-    def _serialize_board_with_accepted_draw(self) -> str:
-        """
-        Serialisiert das Board mit akzeptiertem Remis (beide Spieler haben zugestimmt).
-        
-        Returns:
-            JSON-String mit Board-Zustand
-        """
-        if not self.board:
-            return ""
-        
-        import json
-        board_data = []
-        
-        for row in range(8):
-            for col in range(8):
-                piece = self.board.squares[row, col]
-                board_data.append({
-                    "row": row,
-                    "col": col,
-                    "color": piece.color if piece else None,
-                    "notation": piece.notation if piece else None,
-                })
-
-        # Beide Spieler haben Remis akzeptiert
-        board_data.append({
-            "turn": self.current_turn,
-            "white_time": self.timer.white_time if self.timer else None,
-            "black_time": self.timer.black_time if self.timer else None,
-            "draw_offers": {"white": True, "black": True},  # BEIDE haben akzeptiert
-        })
-
-        return json.dumps(board_data)
-    
     def _deserialize_board(self, board_json: str):
         """
         Deserialisiert ein Board aus einem JSON-String.
@@ -807,7 +765,6 @@ class GameController:
         Returns:
             numpy array mit Board-Zustand
         """
-        import json
         import numpy as np
         from .pieces import King, Queen, Rook, Bishop, Knight, Pawn
         
@@ -886,14 +843,21 @@ class GameController:
         """
         return self.db.list_games(limit=limit)
     
+    def get_all_players(self):
+        """
+        Holt alle Spieler aus der Datenbank.
+        Diese Methode wird vom Frontend (PlayerSelectionScreen) aufgerufen.
+        
+        Returns:
+            Liste von Spieler-Dicts
+        """
+        return self.db.get_all_players()
+
     def get_player_by_id(self, player_id: int):
         """
-        Holt Spieler nach ID aus der Datenbank.
-        Diese Methode wird vom Frontend (HistoryScreen) aufgerufen.
-        
+        Holt einen Spieler anhand der ID aus der Datenbank.
         Args:
-            player_id: ID des Spielers
-            
+            player_id: Die ID des Spielers
         Returns:
             Dict mit Spielerdaten oder None
         """

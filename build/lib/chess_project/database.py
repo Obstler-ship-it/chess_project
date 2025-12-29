@@ -144,6 +144,16 @@ class DatabaseManager:
         )
         return [dict(row) for row in cursor.fetchall()]
     
+    def get_all_players(self) -> List[dict]:
+        """
+        Holt alle Spieler sortiert nach Benutzername.
+        
+        :return: Liste von Dicts mit Spielerdaten
+        """
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT * FROM players ORDER BY username ASC')
+        return [dict(row) for row in cursor.fetchall()]
+    
     def update_player_stats(self, player_id: int, points_delta: int, 
                            won: bool = False, lost: bool = False):
         """

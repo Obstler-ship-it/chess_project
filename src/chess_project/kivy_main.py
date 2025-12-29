@@ -10,14 +10,14 @@ from kivy.uix.screenmanager import ScreenManager
 
 from .game_controller import GameController
 from .ui.screens import (
+    StartMenuScreen,
+    PlayerSelectionScreen,
+    GameScreen,
+    PauseMenuScreen,
+    StatsMenuScreen,
+    LeaderboardScreen,
     GameHistoryScreen,
     GameReplayScreen,
-    GameScreen,
-    LeaderboardScreen,
-    PauseMenuScreen,
-    PlayerSelectionScreen,
-    StartMenuScreen,
-    StatsMenuScreen,
 )
 
 

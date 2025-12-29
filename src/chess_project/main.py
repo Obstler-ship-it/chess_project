@@ -5,7 +5,7 @@ Startet die Kivy-Anwendung.
 
 import sys
 from pathlib import Path
-from .kivy_main import ChessApp
+from chess_project.kivy_main import ChessApp
 
 
 # Optional: Projekt-Root zum Python-Path hinzufügen
@@ -17,6 +17,9 @@ def main():
     """Haupteinstiegspunkt der Anwendung."""
     app = ChessApp()
     app.run()
+
+if __name__ == "__main__":
+    main()
 
 if __name__ == '__main__':
     main()
