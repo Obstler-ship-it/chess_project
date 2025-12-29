@@ -1,8 +1,25 @@
 """App-Entry mit ScreenManager-Konfiguration."""
 
+# DPI-Awareness für Windows aktivieren (vor allen Imports!)
+import os
+import sys
+if sys.platform == 'win32':
+    try:
+        import ctypes
+        # Per-Monitor DPI Awareness (Windows 8.1+)
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)
+    except Exception:
+        try:
+            # System DPI Awareness (Windows Vista+)
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
+
 # Kivy Config MUSS vor anderen Kivy-Imports stehen
 from kivy.config import Config
 Config.set('input', 'mouse', 'mouse,multitouch_on_demand')
+# DPI-Skalierung für Kivy optimieren
+os.environ['KIVY_DPI'] = '96'  # Standard DPI als Basis
 
 from kivy.app import App
 from kivy.core.window import Window

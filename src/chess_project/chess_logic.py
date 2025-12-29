@@ -178,8 +178,8 @@ class ChessLogic:
             )
             for piece in opponent_pieces:
                 legal_moves.extend(piece.get_legal_moves(board_copy))
-        except Exception:
-            raise ValueError('Error simulating move for check detection!')
+        except Exception as exc:
+            raise ValueError('Error simulating move for check detection!') from exc
 
         if self.is_in_check(king_copy, legal_moves):
             return True

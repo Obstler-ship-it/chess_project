@@ -151,7 +151,7 @@ class GameController:
         if self.timer:
             try:
                 self.timer.stop()
-            except:
+            except Exception:
                 pass
         
         self.reset_game_state()

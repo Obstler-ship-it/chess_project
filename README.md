@@ -155,8 +155,7 @@ chess_project/
 ├── pyproject.toml                   # Paket-Konfiguration
 ├── README.md                        # Diese Datei
 ├── LICENSE                          # BSD-Lizenz
-├── class_diagram.puml               # UML-Klassendiagramm
-└── sequence_diagram.puml            # UML-Sequenzdiagramm
+└── chess.db                         # Schach-Datenbank
 ```
 
 ## Datenformatspezifikation
@@ -333,7 +332,7 @@ Diese Features sind bewusst ausgeschlossen, da der Fokus auf der Implementierung
 
 ## Credits
 
-Dieses Projekt wurde mit Unterstützung von KI-Assistenten entwickelt:
+Dieses Projekt wurde mit Unterstützung von **KI-Assistenten** entwickelt:
 
 - **Tests**: Geschrieben von Grok (xAI) – umfassende Unit-Test-Suite mit 47 Tests
 - **UI-Komponenten**: Große Teile der Kivy-Benutzeroberfläche (Screens, Widgets, Popups) geschrieben von Claude Sonnet (Anthropic)
