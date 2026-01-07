@@ -154,7 +154,12 @@ class RemisConfirmPopup(Popup):
             background_color=(0.6, 0.3, 0.3, 1),
             bold=True
         )
-        cancel_btn.bind(on_press=lambda x: self.dismiss())
+        cancel_btn.bind(
+            on_press=lambda x: (
+                self.dismiss(),
+                self.controller.cancel_draw() if self.controller else None
+            )
+        )
         button_box.add_widget(cancel_btn)
 
         confirm_btn = Button(
