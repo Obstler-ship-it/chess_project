@@ -53,7 +53,7 @@ Ein voll funktionsfähiges Schachspiel mit grafischer Benutzeroberfläche, entwi
 
 1. **Repository klonen**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/Obstler-ship-it/chess_project
    cd chess_project
    ```
 
