@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "chess-project"
 version = "1.0.0"
-description = "A Schachspiel implementation with Kivy UI"
+description = "Eine Schachspiel Implementation mit Kivy UI"
 readme = "README.md"
 license = {file = "LICENSE"}
 requires-python = ">=3.8"
@@ -19,7 +19,7 @@ keywords = ["chess", "game", "kivy", "schach"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: End Users/Desktop",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: BSD License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
