@@ -76,11 +76,6 @@ Ein voll funktionsfähiges Schachspiel mit grafischer Benutzeroberfläche, entwi
      source .venv/bin/activate
      ```
 
-4. **Dependencies installieren**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
 ## Nutzung
 
 ### Spiel starten
