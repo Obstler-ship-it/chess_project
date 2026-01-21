@@ -35,7 +35,7 @@ Ein voll funktionsfähiges Schachspiel mit grafischer Benutzeroberfläche, entwi
 
 1. **Repository klonen**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/Obstler-ship-it/chess_project
    cd chess_project
    ```
 
@@ -243,9 +243,6 @@ Das Projekt verwendet folgende Python-Bibliotheken:
 - **NumPy** (`numpy`): Effiziente Array-Operationen für das 8x8 Schachbrett
 - **Kivy** (`kivy`): Cross-Platform GUI Framework für die grafische Oberfläche
 - **pytest** (`pytest`): Unit Testing Framework
-- **pytest-cov** (`pytest-cov`): Code Coverage Plugin für pytest
-
-Alle Dependencies sind in [requirements.txt](requirements.txt) definiert und werden mit `pip install -r requirements.txt` installiert.
 
 ## Tests
 
@@ -253,9 +250,9 @@ Das Projekt enthält umfangreiche Unit Tests für alle Kernkomponenten.
 
 ### Voraussetzungen
 
-pytest muss installiert sein (bereits in requirements.txt enthalten):
+pytest wird für Tests benötigt und kann mit installiert werden:
 ```bash
-pip install pytest pytest-cov
+pip install -e ".[test]"
 ```
 
 ### Test-Struktur
